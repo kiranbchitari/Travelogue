@@ -95,5 +95,14 @@ object Fmt {
     }
 }
 
-/** Parses user-typed amounts leniently ("1,250.50", "1250"). */
-fun String.toAmountOrNull(): Double? = trim().replace(",", "").replace(" ", "").takeIf { it.isNotEmpty() }?.toDoubleOrNull()
+/**
+ * Parses user-typed amounts leniently. A comma is a thousands separator ("1,250.50", "1,50,000")
+ * unless it is the only separator and is followed by one or two digits, in which case it is a
+ * decimal comma ("12,5", "0,85"), as typed on keyboards in most of Europe and South America.
+ */
+fun String.toAmountOrNull(): Double? {
+    val s = trim().replace(" ", "").replace("\u00A0", "")
+    if (s.isEmpty()) return null
+    val decimalComma = '.' !in s && s.count { it == ',' } == 1 && s.substringAfter(',').length in 1..2
+    return (if (decimalComma) s.replace(',', '.') else s.replace(",", "")).toDoubleOrNull()
+}

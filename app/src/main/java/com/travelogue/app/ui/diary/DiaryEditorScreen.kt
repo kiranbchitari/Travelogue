@@ -167,6 +167,7 @@ fun DiaryEditorScreen(nav: Nav, tripId: Long, entryId: Long) {
                 onValuesChange = vm::updateTags,
                 placeholder = "sunset, street food, friends…",
                 suggestions = suggestions,
+                onDraftChange = vm::updateTagDraft,
             )
         }
     }

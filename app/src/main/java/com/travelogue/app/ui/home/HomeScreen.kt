@@ -1,5 +1,6 @@
 package com.travelogue.app.ui.home
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
@@ -7,9 +8,6 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.CalendarMonth
-import androidx.compose.material.icons.rounded.Luggage
-import androidx.compose.material.icons.rounded.Payments
-import androidx.compose.material.icons.rounded.Place
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -18,7 +16,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import com.travelogue.app.core.designsystem.theme.Shapes
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.travelogue.app.core.designsystem.charts.BarChart
 import com.travelogue.app.core.designsystem.components.*
@@ -55,17 +55,7 @@ fun HomeScreen(nav: Nav) {
             return@LazyColumn
         }
 
-        item {
-            PrimaryButton(
-                "Create new trip",
-                onClick = nav::newTrip,
-                icon = Icons.Rounded.Add,
-                modifier = Modifier.padding(horizontal = Space.gutter).fillMaxWidth(),
-            )
-            Spacer(Modifier.height(Space.xxl))
-        }
-
-        item { StatsGrid(s) }
+        item { Ledger(s, onCreate = nav::newTrip) }
 
         if (s.upcoming.isNotEmpty()) {
             item {
@@ -117,9 +107,12 @@ fun HomeScreen(nav: Nav) {
                 modifier = Modifier.padding(horizontal = Space.gutter).padding(top = Space.xxxl, bottom = Space.md),
             )
             SurfaceCard(Modifier.padding(horizontal = Space.gutter).fillMaxWidth()) {
-                Text(Fmt.money(s.monthlyTotal, s.defaultCurrency), style = Travel.type.number, color = Travel.colors.ink)
-                Text("spent across the year · tap a bar for details", style = Travel.type.bodySmall, color = Travel.colors.inkFaint)
-                Spacer(Modifier.height(Space.sm))
+                Overline("Spent across the year")
+                Spacer(Modifier.height(6.dp))
+                MoneyText(Fmt.money(s.monthlyTotal, s.defaultCurrency))
+                Spacer(Modifier.height(2.dp))
+                Text("tap a bar for details", style = Travel.type.bodySmall, color = Travel.colors.inkFaint)
+                Spacer(Modifier.height(Space.md))
                 BarChart(s.monthly, valueLabel = { Fmt.money(it, s.defaultCurrency) }, height = 150.dp)
             }
         }
@@ -181,34 +174,59 @@ private fun Greeting() {
         in 12..16 -> "Good afternoon."
         else -> "Good evening."
     }
-    LargeHeader(overline = Fmt.weekday(LocalDate.now()), title = greeting, modifier = Modifier.padding(bottom = Space.md))
+    LargeHeader(overline = Fmt.weekday(LocalDate.now()), title = greeting, modifier = Modifier.padding(bottom = Space.xs))
     Text(
-        "Every journey, kept beautifully.",
-        style = Travel.type.journal,
+        "every journey, kept beautifully.",
+        style = Travel.type.body,
         color = Travel.colors.inkSoft,
-        modifier = Modifier.padding(horizontal = Space.gutter).padding(bottom = Space.xl),
+        modifier = Modifier.padding(horizontal = Space.gutter).padding(bottom = Space.xxl),
     )
 }
 
+/**
+ * The opening statement of the home screen: one headline figure, three supporting counts divided by
+ * hairlines, and the main action, all on a single card.
+ */
 @Composable
-private fun StatsGrid(s: HomeState) {
-    Column(Modifier.padding(horizontal = Space.gutter), verticalArrangement = Arrangement.spacedBy(Space.md)) {
-        Row(horizontalArrangement = Arrangement.spacedBy(Space.md)) {
-            StatTile("Trips", s.tripCount.toString(), Modifier.weight(1f), icon = Icons.Rounded.Luggage, tint = Travel.colors.accent)
-            StatTile(
-                "Spent on travel",
-                Fmt.money(s.primaryTotal, s.defaultCurrency, compact = true),
-                Modifier.weight(1f),
-                icon = Icons.Rounded.Payments,
-                tint = Travel.colors.secondary,
-                caption = s.otherTotals.entries.takeIf { it.isNotEmpty() }
-                    ?.joinToString(" · ", postfix = " without a rate") { "+" + Fmt.money(it.value, it.key, compact = true) },
+private fun Ledger(s: HomeState, onCreate: () -> Unit) {
+    val c = Travel.colors
+    SurfaceCard(Modifier.padding(horizontal = Space.gutter).fillMaxWidth(), contentPadding = PaddingValues(0.dp)) {
+        Column(Modifier.fillMaxWidth().padding(horizontal = Space.xl).padding(top = Space.xxl, bottom = Space.xl), horizontalAlignment = Alignment.CenterHorizontally) {
+            Overline("Spent on travel · ${s.defaultCurrency}")
+            Spacer(Modifier.height(Space.sm))
+            MoneyText(
+                Fmt.money(s.primaryTotal, s.defaultCurrency),
+                style = Travel.type.display.copy(fontSize = 40.sp, lineHeight = 44.sp),
             )
+            if (s.otherTotals.isNotEmpty()) {
+                Spacer(Modifier.height(Space.sm))
+                Text(
+                    s.otherTotals.entries.joinToString(" · ", postfix = " without a rate") { "+" + Fmt.money(it.value, it.key, compact = true) },
+                    style = Travel.type.bodySmall,
+                    color = c.inkFaint,
+                    textAlign = TextAlign.Center,
+                )
+            }
         }
-        Row(horizontalArrangement = Arrangement.spacedBy(Space.md)) {
-            StatTile("Places visited", s.placesCount.toString(), Modifier.weight(1f), icon = Icons.Rounded.Place, tint = Travel.colors.sage)
-            StatTile("Days travelling", s.travelDays.toString(), Modifier.weight(1f), icon = Icons.Rounded.CalendarMonth, tint = Travel.colors.gold)
+        Hairline()
+        Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min), verticalAlignment = Alignment.CenterVertically) {
+            Figure(s.tripCount.toString(), if (s.tripCount == 1) "Trip" else "Trips", Modifier.weight(1f))
+            Box(Modifier.width(1.dp).fillMaxHeight().background(c.line))
+            Figure(s.placesCount.toString(), if (s.placesCount == 1) "Place" else "Places", Modifier.weight(1f))
+            Box(Modifier.width(1.dp).fillMaxHeight().background(c.line))
+            Figure(s.travelDays.toString(), if (s.travelDays == 1) "Day away" else "Days away", Modifier.weight(1f))
         }
+        Hairline()
+        PrimaryButton("Create new trip", onCreate, Modifier.padding(Space.lg).fillMaxWidth(), icon = Icons.Rounded.Add)
+    }
+}
+
+@Composable
+private fun Figure(value: String, label: String, modifier: Modifier = Modifier) {
+    Column(modifier.padding(vertical = Space.lg), horizontalAlignment = Alignment.CenterHorizontally) {
+        Text(value, style = Travel.type.number.copy(fontSize = 26.sp, lineHeight = 30.sp), color = Travel.colors.ink, maxLines = 1)
+        Spacer(Modifier.height(4.dp))
+        Overline(label)
     }
 }
 
@@ -221,7 +239,7 @@ private fun FirstRun(onCreate: () -> Unit) {
             Column(Modifier.align(Alignment.BottomStart).padding(Space.xl)) {
                 Overline("Your travel journal", color = Color.White.copy(alpha = 0.85f))
                 Spacer(Modifier.height(4.dp))
-                Text("Begin your first story", style = Travel.type.headline, color = Color.White)
+                Text("begin your first story", style = Travel.type.headline, color = Color.White)
             }
         }
         Spacer(Modifier.height(Space.xl))

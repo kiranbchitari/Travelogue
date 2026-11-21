@@ -1,5 +1,10 @@
 package com.travelogue.app.ui.contacts
 
+import com.travelogue.app.ui.common.read
+import com.travelogue.app.ui.common.DraftSlot
+import com.travelogue.app.ui.common.DraftHolder
+import androidx.core.os.bundleOf
+import android.os.Bundle
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -38,7 +43,7 @@ data class ContactForm(
     val associatedWith: String = "",
     val description: String = "",
     val notes: String = "",
-) {
+) : java.io.Serializable {
     val effectiveWhatsapp: String get() = if (sameAsPhone) phone else whatsapp
 }
 
@@ -56,7 +61,7 @@ class ContactEditorViewModel(
     private val journal: JournalRepository,
     val tripId: Long,
     val contactId: Long,
-) : ViewModel() {
+) : ViewModel(), DraftHolder {
     val isNew = contactId == 0L
     var form by mutableStateOf(ContactForm())
         private set
@@ -78,6 +83,12 @@ class ContactEditorViewModel(
         (h.map { it.name } + p.map { it.name }).filter { it.isNotBlank() }.distinct()
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
+    private val draft = DraftSlot(::applyDraft)
+    override fun restoreDraft(draft: Bundle) = this.draft.offer(draft)
+    override fun saveDraft(): Bundle = if (!draft.ready || finished) Bundle() else bundleOf("form" to form)
+
+    private fun applyDraft(b: Bundle) { form = b.read("form") ?: form }
+
     init {
         viewModelScope.launch {
             if (!isNew) {
@@ -91,6 +102,7 @@ class ContactEditorViewModel(
                 }
             }
             loaded = true
+            draft.ready()
         }
     }
 
@@ -124,9 +136,8 @@ class ContactEditorViewModel(
                 )
                 finished = true
             } catch (e: Exception) {
-                _messages.tryEmit(e.message ?: "Couldn't save this contact")
-            } finally {
                 saving = false
+                _messages.tryEmit(e.message ?: "Couldn't save this contact")
             }
         }
     }

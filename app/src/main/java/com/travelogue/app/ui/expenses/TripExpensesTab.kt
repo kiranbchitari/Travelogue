@@ -186,7 +186,7 @@ private fun BudgetSummary(money: TripMoney, onFinance: () -> Unit) {
         Overline("Spent so far")
         Spacer(Modifier.height(Space.xs))
         Row(verticalAlignment = Alignment.Bottom) {
-            Text(Fmt.money(f.total, cur), style = Travel.type.number, color = Travel.colors.ink, modifier = Modifier.weight(1f))
+            MoneyText(Fmt.money(f.total, cur), Modifier.weight(1f))
             Text(
                 "${f.expenseCount} ${if (f.expenseCount == 1) "expense" else "expenses"}",
                 style = Travel.type.bodySmall,

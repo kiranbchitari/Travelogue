@@ -36,19 +36,29 @@ class DemoDataSeeder(
     private val journal: JournalRepository,
     private val diary: DiaryRepository,
     private val photos: PhotoRepository,
+    private val settings: com.travelogue.app.data.settings.SettingsRepository,
 ) {
     private val today = LocalDate.now()
 
     suspend fun remove() = withContext(Dispatchers.IO) {
         trips.observeTripsOnce().filter { it.uuid.startsWith(PREFIX) }.forEach { trips.delete(it.id) }
+        // Take the sample travellers with them, but only the ones seeding itself created, and only
+        // if nothing of the user's refers to them now (deleteTraveller refuses otherwise).
+        settings.demoTravellerIds().forEach { trips.deleteTraveller(it) }
+        settings.setDemoTravellerIds(emptyList())
     }
 
     suspend fun seed() = withContext(Dispatchers.IO) {
         expenses.ensureDefaultCategories()
         remove()
-        kerala()
-        portugal()
-        kyoto()
+        val before = db.travellerDao().getAll().map { it.id }.toSet()
+        try {
+            kerala()
+            portugal()
+            kyoto()
+        } finally {
+            settings.setDemoTravellerIds(db.travellerDao().getAll().map { it.id }.filter { it !in before })
+        }
     }
 
     // ------------------------------------------------------------------------------------------
@@ -68,7 +78,7 @@ class DemoDataSeeder(
             ),
             listOf("Asha", "Dev", "Nikhil"),
         )
-        val t = trips.getTravellers(tripId).associateBy { it.name }
+        val t = trips.getTravellers(tripId).associateByTo(java.util.TreeMap(String.CASE_INSENSITIVE_ORDER)) { it.name }
         val ids = t.values.map { it.id }
         val cat = categories()
 
@@ -182,7 +192,7 @@ class DemoDataSeeder(
             listOf("Asha", "Rohan"),
         )
         trips.setRate(tripId, "EUR", 92.5)
-        val t = trips.getTravellers(tripId).associateBy { it.name }
+        val t = trips.getTravellers(tripId).associateByTo(java.util.TreeMap(String.CASE_INSENSITIVE_ORDER)) { it.name }
         val ids = t.values.map { it.id }
         val cat = categories()
         suspend fun exp(title: String, amount: Double, currency: String, c: String, day: Int, payer: String, loc: String, split: SplitType = SplitType.EQUAL) {

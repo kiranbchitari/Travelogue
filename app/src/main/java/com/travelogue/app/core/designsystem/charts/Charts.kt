@@ -154,6 +154,9 @@ fun DonutChart(
     val progress = remember(slices) { Animatable(0f) }
     LaunchedEffect(slices) { progress.animateTo(1f, tween(900, easing = FastOutSlowInEasing)) }
 
+    // The gesture block outlives recompositions, so it must read the latest selection through state.
+    val currentSelected by rememberUpdatedState(selected)
+    val currentOnSelect by rememberUpdatedState(onSelect)
     Box(modifier.size(size), contentAlignment = Alignment.Center) {
         Canvas(
             Modifier
@@ -164,13 +167,13 @@ fun DonutChart(
                         val cy = this.size.height / 2f
                         val r = hypot(o.x - cx, o.y - cy)
                         val outer = this.size.width / 2f
-                        if (r < outer - thickness.toPx() * 1.6f || r > outer + 8) { onSelect(null); return@detectTapGestures }
+                        if (r < outer - thickness.toPx() * 1.6f || r > outer + 8) { currentOnSelect(null); return@detectTapGestures }
                         var angle = Math.toDegrees(atan2((o.y - cy).toDouble(), (o.x - cx).toDouble())).toFloat() + 90f
                         if (angle < 0) angle += 360f
                         var acc = 0f
                         slices.forEachIndexed { i, s ->
                             val sweep = (s.value / total * 360f).toFloat()
-                            if (angle >= acc && angle < acc + sweep) { onSelect(if (selected == i) null else i); return@detectTapGestures }
+                            if (angle >= acc && angle < acc + sweep) { currentOnSelect(if (currentSelected == i) null else i); return@detectTapGestures }
                             acc += sweep
                         }
                     }

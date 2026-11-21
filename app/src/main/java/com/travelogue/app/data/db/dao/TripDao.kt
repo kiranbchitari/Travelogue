@@ -71,4 +71,12 @@ interface TravellerDao {
     @Update suspend fun update(t: TravellerEntity)
     @Query("DELETE FROM travellers WHERE id = :id") suspend fun delete(id: Long)
     @Query("SELECT COUNT(*) FROM trip_travellers WHERE travellerId = :id") suspend fun tripCount(id: Long): Int
+
+    /** Split shares, settlements and payments that still name this traveller. */
+    @Query(
+        "SELECT (SELECT COUNT(*) FROM expense_splits WHERE travellerId = :id) + " +
+            "(SELECT COUNT(*) FROM settlements WHERE fromTravellerId = :id OR toTravellerId = :id) + " +
+            "(SELECT COUNT(*) FROM expenses WHERE paidByTravellerId = :id)",
+    )
+    suspend fun moneyReferenceCount(id: Long): Int
 }

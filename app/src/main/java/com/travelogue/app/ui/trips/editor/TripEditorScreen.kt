@@ -134,6 +134,7 @@ fun TripEditorScreen(nav: Nav, tripId: Long) {
                         vm::setTravellers,
                         placeholder = "Add a name",
                         suggestions = suggestions,
+                        onDraftChange = { vm.travellerDraft = it },
                     )
                     Text(
                         "Names are used for “paid by” and splitting expenses.",

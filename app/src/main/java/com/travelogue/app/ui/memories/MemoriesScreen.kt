@@ -169,7 +169,7 @@ private fun GalleryCard(g: TripGalleryCard, modifier: Modifier, onClick: () -> U
                 when (g.photoCount) { 0 -> "No photos yet"; 1 -> "1 photo"; else -> "${g.photoCount} photos" },
                 style = Travel.type.label, color = Travel.colors.ink, modifier = Modifier.weight(1f),
             )
-            if (g.favouriteCount > 0) Tag("♥ ${g.favouriteCount}", color = Travel.colors.accent)
+            if (g.favouriteCount > 0) Tag("♥ ${g.favouriteCount}", color = Travel.colors.gold)
             if (g.preview.isNotEmpty()) {
                 Spacer(Modifier.width(Space.md))
                 Box {

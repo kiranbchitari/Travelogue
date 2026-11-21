@@ -18,6 +18,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.em
+import androidx.compose.ui.unit.sp
 import com.travelogue.app.core.designsystem.components.*
 import com.travelogue.app.core.designsystem.theme.Shapes
 import com.travelogue.app.core.designsystem.theme.Space
@@ -32,14 +34,14 @@ import com.travelogue.app.data.db.entity.TripPhotoEntity
 @Composable
 fun PhotoTag(text: String, modifier: Modifier = Modifier, dot: Color? = null) {
     Row(
-        modifier.clip(Shapes.pill).background(Color.Black.copy(alpha = 0.38f)).padding(horizontal = 10.dp, vertical = 5.dp),
+        modifier.clip(Shapes.xs).background(Color.Black.copy(alpha = 0.46f)).padding(horizontal = 8.dp, vertical = 5.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         if (dot != null) {
-            Box(Modifier.size(7.dp).clip(CircleShape).background(dot))
+            Box(Modifier.size(6.dp).clip(CircleShape).background(dot))
             Spacer(Modifier.width(6.dp))
         }
-        Text(text, style = Travel.type.label.copy(fontSize = Travel.type.bodySmall.fontSize), color = Color.White, maxLines = 1)
+        Text(text.uppercase(), style = Travel.type.overline.copy(letterSpacing = 0.1.em), color = Color.White, maxLines = 1)
     }
 }
 
@@ -61,11 +63,11 @@ fun TripHeroCard(
             .fillMaxWidth()
             .height(height)
             .pressable(onClick)
-            .shadow(if (c.isDark) 0.dp else 10.dp, Shapes.lg, spotColor = Color(0x333A2A1A))
+            .shadow(if (c.isDark) 0.dp else 14.dp, Shapes.lg, ambientColor = Color(0x1A000000), spotColor = Color(0x33000000))
             .clip(Shapes.lg),
     ) {
         PhotoImage(trip.coverPath, Modifier.matchParentSize(), contentDescription = trip.name, fallbackSeed = trip.uuid)
-        BottomScrim(0.75f, 0.78f)
+        BottomScrim(0.8f, 0.88f)
         Row(Modifier.align(Alignment.TopStart).padding(Space.lg), horizontalArrangement = Arrangement.spacedBy(Space.sm)) {
             if (showPhase) PhotoTag(trip.phaseLabel(), dot = trip.status.color())
             if (trip.archived) PhotoTag("Archived")
@@ -95,12 +97,12 @@ fun TripHeroCard(
                 Text(Fmt.money(summary.total, trip.currency, compact = true), style = Travel.type.numberSmall, color = Color.White)
             }
             if (trip.budget > 0) {
-                Spacer(Modifier.height(Space.sm))
+                Spacer(Modifier.height(Space.md))
                 ProgressBar(
                     (summary.total / trip.budget).toFloat(),
                     color = Color.White,
                     track = Color.White.copy(alpha = 0.25f),
-                    height = 4.dp,
+                    height = 3.dp,
                 )
                 Spacer(Modifier.height(4.dp))
                 Text(
@@ -121,11 +123,11 @@ fun TripRow(summary: TripSummary, onClick: () -> Unit, modifier: Modifier = Modi
         modifier.fillMaxWidth().clip(Shapes.md).clickable(onClick = onClick).padding(vertical = Space.sm),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        PhotoImage(trip.coverPath, Modifier.size(width = 76.dp, height = 88.dp).clip(Shapes.md), fallbackSeed = trip.uuid)
+        PhotoImage(trip.coverPath, Modifier.size(width = 68.dp, height = 84.dp).clip(Shapes.sm), fallbackSeed = trip.uuid)
         Spacer(Modifier.width(Space.lg))
         Column(Modifier.weight(1f)) {
-            Text(trip.name, style = Travel.type.title, color = Travel.colors.ink, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            Spacer(Modifier.height(2.dp))
+            Text(trip.name, style = Travel.type.title.copy(fontSize = 18.sp), color = Travel.colors.ink, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Spacer(Modifier.height(3.dp))
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Icon(Icons.Rounded.Place, null, tint = Travel.colors.inkFaint, modifier = Modifier.size(14.dp))
                 Spacer(Modifier.width(4.dp))
@@ -168,7 +170,7 @@ fun ExpenseLineRow(
             Text(subtitle, style = Travel.type.bodySmall, color = Travel.colors.inkFaint, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
         Spacer(Modifier.width(Space.md))
-        Text(Fmt.money(expense.amount, expense.currency), style = Travel.type.label, color = Travel.colors.ink)
+        Text(Fmt.money(expense.amount, expense.currency), style = Travel.type.numberSmall.copy(fontSize = 16.sp), color = Travel.colors.ink)
     }
 }
 

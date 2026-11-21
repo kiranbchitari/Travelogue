@@ -37,7 +37,9 @@ class DiaryRepository(private val db: AppDatabase, private val photos: PhotoRepo
             dao.pruneTags()
             id
         }
-        if (newPhotos.isNotEmpty()) photos.addPhotos(entry.tripId, newPhotos, PhotoOwner.DIARY, id, entry.dateTime, captions)
+        undoNewRowOnFailure(isNew = entry.id == 0L, undo = { delete(id) }) {
+            if (newPhotos.isNotEmpty()) photos.addPhotos(entry.tripId, newPhotos, PhotoOwner.DIARY, id, entry.dateTime, captions)
+        }
         return id
     }
 

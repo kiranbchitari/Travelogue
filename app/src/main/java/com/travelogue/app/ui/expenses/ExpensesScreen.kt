@@ -178,7 +178,7 @@ private fun TotalsCard(ui: ExpensesUi, onSetRates: () -> Unit) {
         Overline("Total spent")
         Spacer(Modifier.height(Space.xs))
         Row(verticalAlignment = Alignment.Bottom) {
-            Text(Fmt.money(ui.primaryTotal, ui.primaryCurrency), style = Travel.type.number, color = Travel.colors.ink, modifier = Modifier.weight(1f))
+            MoneyText(Fmt.money(ui.primaryTotal, ui.primaryCurrency), Modifier.weight(1f))
             Text(
                 "${ui.filtered.size} ${if (ui.filtered.size == 1) "expense" else "expenses"}",
                 style = Travel.type.bodySmall,
@@ -233,7 +233,7 @@ private fun CategoryChartCard(ui: ExpensesUi) {
             size = 190.dp,
         )
         Spacer(Modifier.height(Space.lg))
-        ChartLegend(slices.take(8), fmt, selected = selected?.takeIf { it < 8 }, onSelect = { selected = it })
+        ChartLegend(slices, fmt, selected = selected, onSelect = { selected = it })
     }
 }
 

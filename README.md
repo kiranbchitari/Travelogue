@@ -31,7 +31,7 @@ minSdk 26, targetSdk 36, compileSdk 37.
 
 | Package | What lives there |
 |---|---|
-| `core/designsystem` | Theme (warm paper palette, Fraunces + Plus Jakarta Sans), spacing/shapes, reusable components, hand-drawn interactive charts |
+| `core/designsystem` | Theme (monochrome ink-on-white palette with a near-black dark mode, Fraunces + Plus Jakarta Sans), spacing/shapes, reusable components, hand-drawn interactive charts |
 | `core/storage` | `MediaStorage`: copies picked photos and documents into app-private storage (downscaled JPEG), checks free space, reports usage |
 | `core/util` | Formatting (money, dates) and Android intents (call, SMS, WhatsApp, maps links, open file) |
 | `data/db` | Room entities, DAOs, converters, `AppDatabase` (explicit migrations only) |

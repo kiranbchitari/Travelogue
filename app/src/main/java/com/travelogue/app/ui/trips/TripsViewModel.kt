@@ -36,7 +36,7 @@ class TripsViewModel(c: AppContainer) : ViewModel() {
                 TripFilter.ALL -> !t.archived
                 TripFilter.ARCHIVED -> t.archived
                 TripFilter.COMPLETED -> !t.archived && t.isPast(today)
-                TripFilter.ONGOING -> !t.archived && (t.status == TripStatus.ONGOING || t.isOngoing(today))
+                TripFilter.ONGOING -> !t.archived && !t.isPast(today) && (t.status == TripStatus.ONGOING || t.isOngoing(today))
                 TripFilter.UPCOMING -> !t.archived && !t.isPast(today) && t.status == TripStatus.UPCOMING && !t.isOngoing(today)
                 TripFilter.PLANNING -> !t.archived && t.status == TripStatus.PLANNING && !t.isPast(today)
             }

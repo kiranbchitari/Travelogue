@@ -66,12 +66,20 @@ class ReorderState internal constructor(
         val item = draggingItem ?: return
         val top = startOffset + dragDelta
         val bottom = top + item.size
-        val middle = (top + item.size / 2f).toInt()
-        listState.layoutInfo.visibleItemsInfo
-            .firstOrNull { other ->
-                other.key != item.key && canReorder(other.key) && middle in other.offset..(other.offset + other.size)
+        // Swap once the dragged item's leading edge passes the other item's midpoint. Testing the
+        // dragged item's own middle instead makes a short card flip back and forth over a tall one.
+        val others = listState.layoutInfo.visibleItemsInfo.filter { it.key != item.key && canReorder(it.key) }
+        val target = others.lastOrNull { it.index > item.index && bottom > it.offset + it.size / 2f }
+            ?: others.firstOrNull { it.index < item.index && top < it.offset + it.size / 2f }
+        if (target != null) {
+            // The list anchors its scroll position to the first visible item's key. If that item is
+            // one of the two being swapped the whole list would follow it, so pin the position first.
+            val first = listState.firstVisibleItemIndex
+            if (item.index == first || target.index == first) {
+                listState.requestScrollToItem(first, listState.firstVisibleItemScrollOffset)
             }
-            ?.let { onMoveState.value(item.key, it.key) }
+            onMoveState.value(item.key, target.key)
+        }
 
         // Auto-scroll when the dragged item nears the top or bottom of the viewport.
         val info = listState.layoutInfo

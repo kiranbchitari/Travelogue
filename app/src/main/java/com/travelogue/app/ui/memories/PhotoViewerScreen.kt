@@ -108,7 +108,7 @@ fun PhotoViewerScreen(nav: Nav, tripId: Long, photoId: Long, favouritesOnly: Boo
                     if (current.photo.isFavourite) Icons.Rounded.Favorite else Icons.Rounded.FavoriteBorder,
                     { vm.toggleFavourite(current.photo) },
                     contentDescription = if (current.photo.isFavourite) "Remove from favourites" else "Add to favourites",
-                    tint = if (current.photo.isFavourite) Travel.colors.accent else Color.White,
+                    tint = if (current.photo.isFavourite) Color(0xFFFF7A45) else Color.White,
                     background = Color.White.copy(alpha = 0.14f),
                 )
                 Spacer(Modifier.width(Space.sm))

@@ -62,13 +62,15 @@ fun TripPlacesTab(nav: Nav, tripId: Long, modifier: Modifier = Modifier) {
                         item {
                             ChoiceRow(
                                 options = listOf<PlaceCategory?>(null) + categories,
-                                selected = filter,
+                                selected = filter?.takeIf { it in categories },
                                 label = { it?.label ?: "All · ${all.size}" },
                                 onSelect = { filter = it },
                             )
                         }
                     }
-                    val shown = all.filter { filter == null || it.place.category == filter }
+                    // A filter whose chip has disappeared (its last place was deleted) no longer applies.
+                    val active = filter?.takeIf { categories.size > 1 && it in categories }
+                    val shown = all.filter { active == null || it.place.category == active }
                     item {
                         Text(
                             "${shown.size} ${if (shown.size == 1) "place" else "places"} · ${shown.count { it.place.visitDate != null }} dated",

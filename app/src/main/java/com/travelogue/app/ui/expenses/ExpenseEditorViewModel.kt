@@ -1,5 +1,10 @@
 package com.travelogue.app.ui.expenses
 
+import com.travelogue.app.ui.common.read
+import com.travelogue.app.ui.common.DraftSlot
+import com.travelogue.app.ui.common.DraftHolder
+import androidx.core.os.bundleOf
+import android.os.Bundle
 import android.net.Uri
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -26,7 +31,7 @@ class ExpenseEditorViewModel(
     private val expenses: ExpenseRepository,
     val tripId: Long,
     val expenseId: Long,
-) : ViewModel() {
+) : ViewModel(), DraftHolder {
 
     val isEdit = expenseId != 0L
 
@@ -61,6 +66,26 @@ class ExpenseEditorViewModel(
     var saving by mutableStateOf(false); private set
 
     private var original: ExpenseEntity? = null
+
+    private val draft = DraftSlot(::applyDraft)
+    override fun restoreDraft(draft: Bundle) = this.draft.offer(draft)
+    override fun saveDraft(): Bundle = if (!draft.ready) Bundle() else bundleOf(
+        "title" to title, "amount" to amount, "currency" to currency, "categoryId" to categoryId, "date" to date, "time" to time,
+        "location" to location, "paidBy" to paidBy, "paymentMethod" to paymentMethod, "description" to description, "notes" to notes,
+        "splitType" to splitType, "participants" to HashSet(participants), "customShares" to HashMap(customShares),
+        "removeReceipt" to removeReceipt,
+    )
+
+    private fun applyDraft(b: Bundle) {
+        title = b.read("title") ?: title; amount = b.read("amount") ?: amount; currency = b.read("currency") ?: currency
+        categoryId = b.read("categoryId"); date = b.read("date") ?: date; time = b.read("time")
+        location = b.read("location") ?: location; paidBy = b.read("paidBy"); paymentMethod = b.read("paymentMethod") ?: paymentMethod
+        description = b.read("description") ?: description; notes = b.read("notes") ?: notes
+        splitType = b.read("splitType") ?: splitType
+        participants = b.read<HashSet<Long>>("participants") ?: participants
+        customShares = b.read<HashMap<Long, String>>("customShares") ?: customShares
+        if (b.getBoolean("removeReceipt")) { removeReceipt = true; receiptPath = null }
+    }
 
     init {
         viewModelScope.launch {
@@ -98,6 +123,7 @@ class ExpenseEditorViewModel(
             }
             if (participants.isEmpty()) participants = travellers.map { it.id }.toSet()
             loaded = true
+            draft.ready()
         }
     }
 
@@ -140,9 +166,11 @@ class ExpenseEditorViewModel(
         else if (a > 1_000_000_000) e["amount"] = "That amount looks too large"
         if (currency.isBlank() || currency.length !in 3..4) e["currency"] = "Choose a currency"
         if (categoryId == null) e["category"] = "Choose a category"
-        if (splitType != SplitType.NONE) {
+        // With fewer than two travellers the split controls are hidden, so their rules must not apply.
+        val split = if (canSplit) splitType else SplitType.NONE
+        if (split != SplitType.NONE) {
             if (paidBy == null) e["paidBy"] = "Choose who paid to split this expense"
-            when (splitType) {
+            when (split) {
                 SplitType.EQUAL -> if (participants.isEmpty()) e["split"] = "Choose at least one person to share with"
                 SplitType.CUSTOM -> {
                     if (customShares.values.none { (it.toAmountOrNull() ?: 0.0) > 0 }) e["split"] = "Enter how much each person owes"
@@ -189,9 +217,8 @@ class ExpenseEditorViewModel(
                 expenses.save(row, shares, newReceipt = pendingReceipt, removeReceipt = removeReceipt && pendingReceipt == null)
                 onSaved()
             } catch (t: Throwable) {
-                onError(t.message ?: "Could not save the expense")
-            } finally {
                 saving = false
+                onError(t.message ?: "Could not save the expense")
             }
         }
     }

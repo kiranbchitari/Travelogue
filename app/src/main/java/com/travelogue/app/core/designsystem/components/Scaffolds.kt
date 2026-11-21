@@ -4,6 +4,7 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
@@ -74,7 +75,7 @@ fun TopBar(
             Spacer(Modifier.width(Space.md))
         }
         Column(Modifier.weight(1f)) {
-            Text(title, style = Travel.type.title, color = Travel.colors.ink, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(title.voice(), style = Travel.type.title, color = Travel.colors.ink, maxLines = 1, overflow = TextOverflow.Ellipsis)
             if (subtitle != null) Text(subtitle, style = Travel.type.bodySmall, color = Travel.colors.inkFaint, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
         Row(horizontalArrangement = Arrangement.spacedBy(Space.sm), verticalAlignment = Alignment.CenterVertically, content = actions)
@@ -95,8 +96,8 @@ fun LargeHeader(
     ) {
         Column(Modifier.weight(1f)) {
             Overline(overline)
-            Spacer(Modifier.height(4.dp))
-            Text(title, style = Travel.type.display, color = Travel.colors.ink)
+            Spacer(Modifier.height(6.dp))
+            Text(title.voice(), style = Travel.type.display, color = Travel.colors.ink)
         }
         trailing()
     }
@@ -123,7 +124,7 @@ fun OverflowMenu(items: List<MenuItem>, modifier: Modifier = Modifier, backgroun
 }
 
 /**
- * Friendly empty state with a layered circular illustration. Every list in the app uses this rather
+ * Quiet empty state: an ink disc inside hairline rings. Every list in the app uses this rather
  * than a blank screen.
  */
 @Composable
@@ -137,16 +138,16 @@ fun EmptyState(
 ) {
     val c = Travel.colors
     Column(modifier.fillMaxWidth().padding(horizontal = Space.xxxl, vertical = Space.huge), horizontalAlignment = Alignment.CenterHorizontally) {
+        // Concentric hairline rings around a solid ink disc.
         Box(contentAlignment = Alignment.Center) {
-            Box(Modifier.size(132.dp).clip(CircleShape).background(Brush.radialGradient(listOf(c.accentSoft, c.background))))
-            Box(Modifier.size(88.dp).clip(CircleShape).background(c.card), contentAlignment = Alignment.Center) {
-                Icon(icon, null, tint = c.accent, modifier = Modifier.size(38.dp))
+            Box(Modifier.size(136.dp).border(1.dp, c.line.copy(alpha = 0.6f), CircleShape))
+            Box(Modifier.size(104.dp).border(1.dp, c.line, CircleShape))
+            Box(Modifier.size(72.dp).clip(CircleShape).background(c.accent), contentAlignment = Alignment.Center) {
+                Icon(icon, null, tint = c.onAccent, modifier = Modifier.size(30.dp))
             }
-            Box(Modifier.align(Alignment.TopEnd).padding(top = 14.dp, end = 10.dp).size(14.dp).clip(CircleShape).background(c.gold.copy(alpha = 0.7f)))
-            Box(Modifier.align(Alignment.BottomStart).padding(bottom = 18.dp, start = 8.dp).size(10.dp).clip(CircleShape).background(c.secondary.copy(alpha = 0.5f)))
         }
-        Spacer(Modifier.height(Space.xl))
-        Text(title, style = Travel.type.title, color = c.ink, textAlign = TextAlign.Center)
+        Spacer(Modifier.height(Space.xxl))
+        Text(title.voice(), style = Travel.type.title, color = c.ink, textAlign = TextAlign.Center)
         Spacer(Modifier.height(Space.sm))
         Text(message, style = Travel.type.body, color = c.inkSoft, textAlign = TextAlign.Center)
         if (actionLabel != null && onAction != null) {
@@ -159,7 +160,7 @@ fun EmptyState(
 @Composable
 fun LoadingState(modifier: Modifier = Modifier) {
     Box(modifier.fillMaxWidth().padding(Space.huge), contentAlignment = Alignment.Center) {
-        CircularProgressIndicator(color = Travel.colors.accent, strokeWidth = 2.dp)
+        CircularProgressIndicator(color = Travel.colors.ink, strokeWidth = 1.5.dp, modifier = Modifier.size(28.dp))
     }
 }
 
@@ -177,7 +178,7 @@ fun ConfirmDialog(
         onDismissRequest = onDismiss,
         containerColor = Travel.colors.cardHigh,
         shape = Shapes.lg,
-        title = { Text(title, style = Travel.type.title, color = Travel.colors.ink) },
+        title = { Text(title.voice(), style = Travel.type.title, color = Travel.colors.ink) },
         text = { Text(message, style = Travel.type.body, color = Travel.colors.inkSoft) },
         confirmButton = {
             TextButton(onClick = { onConfirm(); onDismiss() }) {
@@ -202,7 +203,7 @@ fun TravelSheet(onDismiss: () -> Unit, title: String? = null, content: @Composab
     ) {
         Column(Modifier.fillMaxWidth().padding(horizontal = Space.gutter).padding(bottom = Space.xxl).navigationBarsPadding()) {
             if (title != null) {
-                Text(title, style = Travel.type.title, color = Travel.colors.ink)
+                Text(title.voice(), style = Travel.type.title, color = Travel.colors.ink)
                 Spacer(Modifier.height(Space.lg))
             }
             content()

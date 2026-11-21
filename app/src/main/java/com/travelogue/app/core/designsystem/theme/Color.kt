@@ -4,41 +4,39 @@ import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.Color
 
-/** Raw palette. Warm paper, charcoal ink and a few earthy accents. */
+/**
+ * Raw palette. Monochrome first: crisp off-white and true ink in light, near-black in dark, with one
+ * hot accent and one emerald used sparingly. Colour is reserved for data, status and photos.
+ */
 object Palette {
-    val Paper = Color(0xFFF6F1EA)
-    val PaperDeep = Color(0xFFEFE8DE)
-    val Card = Color(0xFFFFFCF8)
-    val Ink = Color(0xFF1E1C1A)
-    val InkSoft = Color(0xFF5F5852)
-    val InkFaint = Color(0xFF9A928A)
-    val Line = Color(0xFFE6DED3)
+    val Canvas = Color(0xFFF5F5F3)
+    val CanvasDeep = Color(0xFFECECE9)
+    val Card = Color(0xFFFFFFFF)
+    val Ink = Color(0xFF0E0E0E)
+    val InkSoft = Color(0xFF5A5A5A)
+    val InkFaint = Color(0xFF9B9B9B)
+    val Line = Color(0xFFE4E4E0)
 
-    val Terracotta = Color(0xFFC5603C)
-    val TerracottaSoft = Color(0xFFF5E1D7)
-    val Teal = Color(0xFF2F5D62)
-    val TealSoft = Color(0xFFDCE8E6)
-    val Ochre = Color(0xFFC99A2E)
-    val OchreSoft = Color(0xFFF6EBCF)
-    val Sage = Color(0xFF7D8F5E)
-    val SageSoft = Color(0xFFE6EBDA)
-    val Plum = Color(0xFF7A4E6B)
-    val Rose = Color(0xFFD98B84)
-    val Slate = Color(0xFF52687D)
-    val Sand = Color(0xFFB79C7A)
-    val Danger = Color(0xFFB3412E)
-    val Success = Color(0xFF4F7D4A)
+    val Ember = Color(0xFFDD552B)
+    val EmberSoft = Color(0xFFFBE7DD)
+    val Emerald = Color(0xFF0B6E4F)
+    val EmeraldSoft = Color(0xFFDDEEE7)
+    val Moss = Color(0xFF6C8362)
+    val MossSoft = Color(0xFFE6ECE1)
+    val Danger = Color(0xFFC8321E)
+    val Success = Color(0xFF1B8A5A)
 
     // Dark
-    val Night = Color(0xFF141211)
-    val NightCard = Color(0xFF1F1C1A)
-    val NightCardHigh = Color(0xFF292522)
-    val NightInk = Color(0xFFF3EDE5)
-    val NightInkSoft = Color(0xFFBDB3A8)
-    val NightInkFaint = Color(0xFF857B71)
-    val NightLine = Color(0xFF34302C)
-    val TerracottaNight = Color(0xFFE38A66)
-    val TealNight = Color(0xFF7FB2B0)
+    val Night = Color(0xFF060606)
+    val NightDeep = Color(0xFF000000)
+    val NightCard = Color(0xFF121212)
+    val NightCardHigh = Color(0xFF1C1C1C)
+    val NightInk = Color(0xFFF5F5F5)
+    val NightInkSoft = Color(0xFFB4B4B4)
+    val NightInkFaint = Color(0xFF7A7A7A)
+    val NightLine = Color(0xFF272727)
+    val EmberNight = Color(0xFFFF7A45)
+    val EmeraldNight = Color(0xFF3DDC97)
 }
 
 /** Semantic colors used by every screen. */
@@ -68,55 +66,55 @@ data class TravelColors(
 )
 
 val LightTravelColors = TravelColors(
-    background = Palette.Paper,
-    backgroundDeep = Palette.PaperDeep,
+    background = Palette.Canvas,
+    backgroundDeep = Palette.CanvasDeep,
     card = Palette.Card,
     cardHigh = Color(0xFFFFFFFF),
     ink = Palette.Ink,
     inkSoft = Palette.InkSoft,
     inkFaint = Palette.InkFaint,
     line = Palette.Line,
-    accent = Palette.Terracotta,
-    accentSoft = Palette.TerracottaSoft,
+    accent = Palette.Ink,
+    accentSoft = Color(0xFFEDEDEA),
     onAccent = Color.White,
-    secondary = Palette.Teal,
-    secondarySoft = Palette.TealSoft,
-    gold = Palette.Ochre,
-    goldSoft = Palette.OchreSoft,
-    sage = Palette.Sage,
-    sageSoft = Palette.SageSoft,
+    secondary = Palette.Emerald,
+    secondarySoft = Palette.EmeraldSoft,
+    gold = Palette.Ember,
+    goldSoft = Palette.EmberSoft,
+    sage = Palette.Moss,
+    sageSoft = Palette.MossSoft,
     danger = Palette.Danger,
     success = Palette.Success,
     chart = listOf(
-        Palette.Terracotta, Palette.Teal, Palette.Ochre, Palette.Sage, Palette.Plum,
-        Palette.Slate, Palette.Rose, Palette.Sand, Color(0xFF8C6A4F), Color(0xFF4E8A86), Color(0xFFA3A3A3),
+        Palette.Ink, Palette.Ember, Palette.Emerald, Color(0xFF3D4EDB), Color(0xFFE0A21A),
+        Color(0xFF8A3F7A), Color(0xFF4A6078), Color(0xFFE0718A), Color(0xFFB59A76), Color(0xFF2E9C99), Color(0xFFA3A3A3),
     ),
     isDark = false,
 )
 
 val DarkTravelColors = TravelColors(
     background = Palette.Night,
-    backgroundDeep = Color(0xFF0E0C0B),
+    backgroundDeep = Palette.NightDeep,
     card = Palette.NightCard,
     cardHigh = Palette.NightCardHigh,
     ink = Palette.NightInk,
     inkSoft = Palette.NightInkSoft,
     inkFaint = Palette.NightInkFaint,
     line = Palette.NightLine,
-    accent = Palette.TerracottaNight,
-    accentSoft = Color(0xFF3A2620),
-    onAccent = Color(0xFF1E1C1A),
-    secondary = Palette.TealNight,
-    secondarySoft = Color(0xFF1E3133),
-    gold = Color(0xFFE0B654),
-    goldSoft = Color(0xFF3A3020),
-    sage = Color(0xFFA9BA88),
-    sageSoft = Color(0xFF2A2F22),
-    danger = Color(0xFFE07A66),
-    success = Color(0xFF86B57F),
+    accent = Palette.NightInk,
+    accentSoft = Color(0xFF242424),
+    onAccent = Palette.Ink,
+    secondary = Palette.EmeraldNight,
+    secondarySoft = Color(0xFF10291F),
+    gold = Palette.EmberNight,
+    goldSoft = Color(0xFF33190E),
+    sage = Color(0xFFA8BF9B),
+    sageSoft = Color(0xFF1E261B),
+    danger = Color(0xFFFF6B57),
+    success = Color(0xFF4ADE94),
     chart = listOf(
-        Palette.TerracottaNight, Palette.TealNight, Color(0xFFE0B654), Color(0xFFA9BA88), Color(0xFFB98AAB),
-        Color(0xFF8FA7BE), Color(0xFFE6A39C), Color(0xFFD1BA98), Color(0xFFB8957A), Color(0xFF7DBDB8), Color(0xFF8E8E8E),
+        Palette.NightInk, Palette.EmberNight, Palette.EmeraldNight, Color(0xFF8C98FF), Color(0xFFF2C14E),
+        Color(0xFFD08BC0), Color(0xFF8FA7BE), Color(0xFFF29AB0), Color(0xFFD1BA98), Color(0xFF6CCFCB), Color(0xFF8E8E8E),
     ),
     isDark = true,
 )

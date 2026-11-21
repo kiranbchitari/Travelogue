@@ -1,11 +1,17 @@
 package com.travelogue.app.ui.navigation
 
+import android.app.Activity
+import android.content.Context
+import android.content.ContextWrapper
 import androidx.compose.animation.*
+import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.AccountBalanceWallet
 import androidx.compose.material.icons.outlined.AutoStories
@@ -26,7 +32,11 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.em
+import androidx.compose.ui.unit.sp
+import androidx.core.view.WindowCompat
 import androidx.navigation.NavDestination.Companion.hasRoute
 import androidx.navigation.NavDestination.Companion.hierarchy
 import androidx.navigation.compose.NavHost
@@ -130,7 +140,7 @@ fun AppRoot() {
                     .align(Alignment.TopCenter)
                     .fillMaxWidth()
                     .windowInsetsTopHeight(WindowInsets.statusBars)
-                    .background(Travel.colors.background.copy(alpha = 0.94f)),
+                    .background(Travel.colors.background),
             )
         }
 
@@ -140,51 +150,76 @@ fun AppRoot() {
             enter = fadeIn() + slideInVertically { it },
             exit = fadeOut() + slideOutVertically { it },
         ) {
-            FloatingBottomBar(current = currentTab, onSelect = { nav.tab(it.route) })
+            DockedBottomBar(current = currentTab, onSelect = { nav.tab(it.route) })
         }
+        NavBarIcons(lightIcons = currentTab != null || Travel.colors.isDark)
         BackupHost()
     }
 }
 
-/** Floating pill navigation bar. The selected tab expands to show its label. */
+/**
+ * Docked ink bar. Each tab is an icon over a tracked micro-label; the current one is lit and sits
+ * under a short ember rule. The bar stays ink in both themes.
+ */
 @Composable
-private fun FloatingBottomBar(current: TabItem?, onSelect: (TabItem) -> Unit) {
+private fun DockedBottomBar(current: TabItem?, onSelect: (TabItem) -> Unit) {
     val c = Travel.colors
+    val shape = RoundedCornerShape(topStart = 22.dp, topEnd = 22.dp)
     Row(
         Modifier
-            .navigationBarsPadding()
-            .padding(horizontal = Space.gutter, vertical = Space.md)
             .fillMaxWidth()
-            .shadow(if (c.isDark) 4.dp else 18.dp, Shapes.pill, ambientColor = Color(0x22000000), spotColor = Color(0x33000000))
-            .clip(Shapes.pill)
-            .background(if (c.isDark) c.cardHigh else c.ink)
-            .padding(horizontal = 8.dp, vertical = 8.dp),
-        horizontalArrangement = Arrangement.SpaceBetween,
+            .shadow(if (c.isDark) 0.dp else 24.dp, shape, ambientColor = Color(0x33000000), spotColor = Color(0x55000000))
+            .clip(shape)
+            .background(if (c.isDark) Color(0xFF101010) else Color(0xFF0E0E0E))
+            .border(1.dp, Color.White.copy(alpha = if (c.isDark) 0.08f else 0f), shape)
+            .navigationBarsPadding()
+            .height(66.dp)
+            .padding(horizontal = Space.sm),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Tabs.forEach { tab ->
             val selected = tab == current
-            val fg = if (c.isDark) c.ink else c.background
-            Row(
+            val tint by animateColorAsState(if (selected) Color.White else Color.White.copy(alpha = 0.42f), label = "tabTint")
+            val rule by animateDpAsState(if (selected) 18.dp else 0.dp, label = "tabRule")
+            Column(
                 Modifier
-                    .clip(Shapes.pill)
-                    .background(if (selected) c.accent else Color.Transparent)
-                    .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) { onSelect(tab) }
-                    .animateContentSize()
-                    .padding(horizontal = if (selected) 16.dp else 12.dp, vertical = 10.dp),
-                verticalAlignment = Alignment.CenterVertically,
+                    .weight(1f)
+                    .fillMaxHeight()
+                    .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) { onSelect(tab) },
+                horizontalAlignment = Alignment.CenterHorizontally,
             ) {
-                Icon(
-                    if (selected) tab.selectedIcon else tab.icon,
-                    contentDescription = tab.label,
-                    tint = if (selected) c.onAccent else fg.copy(alpha = 0.7f),
-                    modifier = Modifier.size(22.dp),
+                Box(Modifier.width(rule).height(2.dp).clip(Shapes.pill).background(Color(0xFFFF7A45)))
+                Spacer(Modifier.weight(1f))
+                Icon(if (selected) tab.selectedIcon else tab.icon, contentDescription = tab.label, tint = tint, modifier = Modifier.size(22.dp))
+                Spacer(Modifier.height(5.dp))
+                Text(
+                    tab.label.uppercase(),
+                    style = Travel.type.overline.copy(fontSize = 9.sp, letterSpacing = 0.12.em),
+                    color = tint,
+                    maxLines = 1,
                 )
-                if (selected) {
-                    Spacer(Modifier.width(6.dp))
-                    Text(tab.label, style = Travel.type.label, color = c.onAccent, maxLines = 1)
-                }
+                Spacer(Modifier.weight(1f))
             }
         }
     }
+}
+
+/** The bar is ink even in the light theme, so the system navigation icons over it must be light. */
+@Composable
+private fun NavBarIcons(lightIcons: Boolean) {
+    val view = LocalView.current
+    val dark = Travel.colors.isDark
+    if (view.isInEditMode) return
+    DisposableEffect(lightIcons, dark) {
+        val window = view.context.findActivity()?.window
+        val controller = window?.let { WindowCompat.getInsetsController(it, view) }
+        controller?.isAppearanceLightNavigationBars = !lightIcons
+        onDispose { controller?.isAppearanceLightNavigationBars = !dark }
+    }
+}
+
+private tailrec fun Context.findActivity(): Activity? = when (this) {
+    is Activity -> this
+    is ContextWrapper -> baseContext.findActivity()
+    else -> null
 }

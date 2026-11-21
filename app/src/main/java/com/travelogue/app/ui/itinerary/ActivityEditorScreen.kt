@@ -1,5 +1,10 @@
 package com.travelogue.app.ui.itinerary
 
+import com.travelogue.app.ui.common.read
+import com.travelogue.app.ui.common.DraftSlot
+import com.travelogue.app.ui.common.DraftHolder
+import androidx.core.os.bundleOf
+import android.os.Bundle
 import android.net.Uri
 import android.widget.Toast
 import androidx.compose.foundation.layout.*
@@ -38,7 +43,7 @@ class ActivityEditorViewModel(
     private val tripId: Long,
     private val activityId: Long,
     initialDayId: Long,
-) : ViewModel() {
+) : ViewModel(), DraftHolder {
     val isEdit = activityId != 0L
     var loaded by mutableStateOf(false); private set
     var trip by mutableStateOf<TripEntity?>(null); private set
@@ -67,6 +72,24 @@ class ActivityEditorViewModel(
 
     private var original: ItineraryActivityEntity? = null
 
+    private val draft = DraftSlot(::applyDraft)
+    override fun restoreDraft(draft: Bundle) = this.draft.offer(draft)
+    override fun saveDraft(): Bundle = if (!draft.ready) Bundle() else bundleOf(
+        "name" to name, "dayId" to dayId, "location" to location, "startTime" to startTime, "endTime" to endTime,
+        "description" to description, "estimated" to estimated, "actual" to actual, "status" to status, "notes" to notes,
+        "removePhoto" to removePhoto,
+    )
+
+    private fun applyDraft(b: Bundle) {
+        name = b.read("name") ?: name
+        // Only keep the chosen day if it still exists.
+        b.read<Long>("dayId")?.takeIf { id -> days.any { it.id == id } }?.let { dayId = it }
+        location = b.read("location") ?: location; startTime = b.read("startTime"); endTime = b.read("endTime")
+        description = b.read("description") ?: description; estimated = b.read("estimated") ?: estimated; actual = b.read("actual") ?: actual
+        status = b.read("status") ?: status; notes = b.read("notes") ?: notes
+        if (b.getBoolean("removePhoto")) { removePhoto = true; savedPhoto = null }
+    }
+
     init {
         viewModelScope.launch {
             trip = trips.get(tripId)
@@ -85,13 +108,18 @@ class ActivityEditorViewModel(
                 dayId = (days.firstOrNull { it.date == LocalDate.now() } ?: days.firstOrNull())?.id ?: 0L
             }
             loaded = true
+            draft.ready()
         }
     }
 
-    fun pickPhoto(uri: Uri) { pendingPhoto = uri; removePhoto = false }
+    // removePhoto is left as it is: the repository prefers a new photo when one is set, and if that
+    // pick is cleared again the earlier removal still has to apply.
+    fun pickPhoto(uri: Uri) { pendingPhoto = uri }
     fun clearPhoto() { if (pendingPhoto != null) pendingPhoto = null else { savedPhoto = null; removePhoto = true } }
 
     fun save(onError: (String) -> Unit, onDone: () -> Unit) {
+        // Stays set after a successful save so a second tap during the exit transition is ignored.
+        if (saving) return
         nameError = if (name.isBlank()) "Give the activity a name" else null
         dayError = if (dayId == 0L) "Choose a day" else null
         timeError = if (startTime != null && endTime != null && !endTime!!.isAfter(startTime)) "End time must be after the start time" else null
@@ -115,9 +143,8 @@ class ActivityEditorViewModel(
                 )
                 onDone()
             } catch (e: Exception) {
-                onError(e.message ?: "Could not save the activity")
-            } finally {
                 saving = false
+                onError(e.message ?: "Could not save the activity")
             }
         }
     }

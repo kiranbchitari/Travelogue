@@ -1,5 +1,6 @@
 package com.travelogue.app.domain
 
+import com.travelogue.app.core.util.toAmountOrNull
 import com.travelogue.app.data.db.entity.*
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
@@ -111,4 +112,25 @@ class FinanceTest {
         assertEquals(rates, decoded)
         assertTrue(com.travelogue.app.data.settings.SettingsRepository.decodeRates("garbage;EU>INR=1;EUR>INR=-2").isEmpty())
     }
+
+    @Test fun foreignCurrencySplitLeavesNoStrayCent() {
+        // 100 EUR at 92.5, split three ways: converted shares round to 3083.95 + 3083.03 + 3083.03.
+        val e = expense(1, 100.0, 1, 2, currency = "EUR")
+        val splits = SplitCalculator.equalShares(100.0, listOf(1, 2, 3)).map { (t, a) -> ExpenseSplitEntity(expenseId = 1, travellerId = t, amount = a) }
+        val b = SplitCalculator.balances(listOf(1, 2, 3), listOf(e), splits, emptyList(), CurrencyConverter("INR", mapOf("EUR" to 92.5)))
+        assertEquals(0.0, b.sumOf { it.net }, 0.0001)
+    }
+
+    @Test fun amountsParseWithEitherDecimalSeparator() {
+        assertEquals(1250.5, "1,250.50".toAmountOrNull()!!, 0.0001)
+        assertEquals(150000.0, "1,50,000".toAmountOrNull()!!, 0.0001)
+        assertEquals(1250.0, "1,250".toAmountOrNull()!!, 0.0001)
+        assertEquals(12.5, "12,50".toAmountOrNull()!!, 0.0001)
+        assertEquals(0.85, "0,85".toAmountOrNull()!!, 0.0001)
+        assertEquals(49.6, "49,6".toAmountOrNull()!!, 0.0001)
+        assertEquals(1250.0, " 1250 ".toAmountOrNull()!!, 0.0001)
+        assertNull("".toAmountOrNull())
+        assertNull("abc".toAmountOrNull())
+    }
+
 }

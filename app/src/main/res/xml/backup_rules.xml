@@ -1,6 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!--
+  Cloud backup carries settings only. Trips are deliberately left out: their photos and documents are
+  far beyond the 25 MB cloud quota, and restoring the database without them leaves every cover, photo
+  and receipt pointing at a file that is not there. Trips move between phones through the in-app ZIP
+  export, or a direct device-to-device transfer (see data_extraction_rules.xml).
+-->
 <full-backup-content>
-    <include domain="database" path="." />
     <include domain="sharedpref" path="." />
     <include domain="file" path="datastore/" />
 </full-backup-content>

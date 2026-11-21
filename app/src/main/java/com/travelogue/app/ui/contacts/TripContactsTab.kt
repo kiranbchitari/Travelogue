@@ -68,7 +68,8 @@ fun TripContactsTab(nav: Nav, tripId: Long, modifier: Modifier = Modifier) {
                             )
                         }
                     }
-                    val q = query.trim()
+                    // The search box only shows for longer lists; without it a stale query must not filter.
+                    val q = if (all.size > 6) query.trim() else ""
                     val shown = if (q.isEmpty()) all else all.filter {
                         it.name.contains(q, true) || it.phone.contains(q) || it.whatsapp.contains(q) ||
                             it.associatedWith.contains(q, true) || it.type.label.contains(q, true) || it.address.contains(q, true)

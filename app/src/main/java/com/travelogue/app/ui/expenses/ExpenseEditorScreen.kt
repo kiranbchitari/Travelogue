@@ -199,8 +199,6 @@ private fun AmountHero(vm: ExpenseEditorViewModel) {
         (listOfNotNull(vm.trip?.currency, vm.currency) + CommonCurrencies).distinct()
     }
     SurfaceCard(contentPadding = PaddingValues(Space.xl)) {
-        Overline("Amount", Modifier.align(Alignment.CenterHorizontally))
-        Spacer(Modifier.height(Space.md))
         Row(verticalAlignment = Alignment.Top, horizontalArrangement = Arrangement.spacedBy(Space.md)) {
             AmountField(
                 label = "Amount",

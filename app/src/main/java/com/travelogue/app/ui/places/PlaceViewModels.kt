@@ -1,5 +1,10 @@
 package com.travelogue.app.ui.places
 
+import com.travelogue.app.ui.common.read
+import com.travelogue.app.ui.common.DraftSlot
+import com.travelogue.app.ui.common.DraftHolder
+import androidx.core.os.bundleOf
+import android.os.Bundle
 import android.content.Context
 import android.net.Uri
 import androidx.compose.runtime.getValue
@@ -102,7 +107,7 @@ data class PlaceForm(
     val description: String = "",
     val rating: Int = 0,
     val notes: String = "",
-)
+) : java.io.Serializable
 
 data class PlaceErrors(
     val name: String? = null,
@@ -150,7 +155,7 @@ class PlaceEditorViewModel(
     private val trips: TripRepository,
     val tripId: Long,
     val placeId: Long,
-) : ViewModel() {
+) : ViewModel(), DraftHolder {
     val isNew = placeId == 0L
     var form by mutableStateOf(PlaceForm())
         private set
@@ -168,9 +173,23 @@ class PlaceEditorViewModel(
     private val _messages = MutableSharedFlow<String>(extraBufferCapacity = 4)
     val messages: SharedFlow<String> = _messages
 
+    /** Saved photos removed in this edit. They are only deleted for real when the edit is saved. */
+    private val removedSaved = kotlinx.coroutines.flow.MutableStateFlow<Set<Long>>(emptySet())
+
     val savedPhotos: StateFlow<List<TripPhotoEntity>> =
         (if (isNew) flowOf(emptyList()) else photoRepo.observeFor(PhotoOwner.PLACE, placeId))
+            .combine(removedSaved) { list, gone -> list.filter { it.id !in gone } }
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    private val draft = DraftSlot(::applyDraft)
+    override fun restoreDraft(draft: Bundle) = this.draft.offer(draft)
+    override fun saveDraft(): Bundle =
+        if (!draft.ready || finished) Bundle() else bundleOf("form" to form, "removedSaved" to HashSet(removedSaved.value))
+
+    private fun applyDraft(b: Bundle) {
+        form = b.read("form") ?: form
+        removedSaved.value = b.read<HashSet<Long>>("removedSaved") ?: removedSaved.value
+    }
 
     init {
         viewModelScope.launch {
@@ -194,6 +213,7 @@ class PlaceEditorViewModel(
                 }
             }
             loaded = true
+            draft.ready()
         }
     }
 
@@ -203,7 +223,7 @@ class PlaceEditorViewModel(
 
     fun addPhotos(uris: List<Uri>) { uris.forEach { if (it !in pending) pending.add(it) } }
     fun removePending(uri: Uri) { pending.remove(uri) }
-    fun removeSaved(photo: TripPhotoEntity) { viewModelScope.launch { photoRepo.delete(photo.id) } }
+    fun removeSaved(photo: TripPhotoEntity) { removedSaved.value += photo.id }
 
     fun save() {
         if (saving) return
@@ -230,12 +250,12 @@ class PlaceEditorViewModel(
                     notes = f.notes.trim(),
                 )
                 journal.savePlace(row, pending.toList())
+                removedSaved.value.forEach { photoRepo.delete(it) }
                 pending.clear()
                 finished = true
             } catch (e: Exception) {
-                _messages.tryEmit(e.message ?: "Couldn't save this place")
-            } finally {
                 saving = false
+                _messages.tryEmit(e.message ?: "Couldn't save this place")
             }
         }
     }

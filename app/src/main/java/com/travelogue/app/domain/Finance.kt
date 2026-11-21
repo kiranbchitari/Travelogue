@@ -112,12 +112,17 @@ object SplitCalculator {
             if (e.splitType == SplitType.NONE || e.paidByTravellerId == null) continue
             val rows = splitsByExpense[e.id].orEmpty()
             if (rows.isEmpty()) continue
-            val total = converter.toBase(e.amount, e.currency) ?: continue
-            paid[e.paidByTravellerId] = (paid[e.paidByTravellerId] ?: 0.0) + total
+            if (converter.toBase(e.amount, e.currency) == null) continue
+            // Each share is converted and rounded to cents on its own, and the payer is credited with
+            // exactly the sum of those rounded shares. Crediting the converted total instead leaves a
+            // stray cent that nobody owes whenever a foreign-currency amount is split three ways.
+            var credited = 0.0
             for (s in rows) {
-                val part = converter.toBase(s.amount, e.currency) ?: continue
+                val part = (converter.toBase(s.amount, e.currency) ?: continue).roundMoney()
                 share[s.travellerId] = (share[s.travellerId] ?: 0.0) + part
+                credited += part
             }
+            paid[e.paidByTravellerId] = (paid[e.paidByTravellerId] ?: 0.0) + credited
         }
         val out = HashMap<Long, Double>()
         val inn = HashMap<Long, Double>()

@@ -3,6 +3,7 @@ package com.travelogue.app.core.designsystem.components
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
@@ -26,6 +27,8 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.em
+import androidx.compose.ui.unit.sp
 import com.travelogue.app.core.designsystem.theme.Shapes
 import com.travelogue.app.core.designsystem.theme.Space
 import com.travelogue.app.core.designsystem.theme.Travel
@@ -43,8 +46,15 @@ fun Modifier.pressable(onClick: (() -> Unit)?, enabled: Boolean = true): Modifie
 }
 
 /**
- * The single card style of the app: soft paper-white surface, large radius, very light shadow,
- * no border. Avoid nesting these.
+ * House voice for interface copy: headings, section titles and buttons are set in lowercase.
+ * User-entered text (trip names, places, notes) never goes through this. Return [this] unchanged
+ * to switch the whole app back to sentence case.
+ */
+fun String.voice(): String = lowercase()
+
+/**
+ * The single card style of the app: crisp flat surface, tight radius, hairline border and a barely
+ * there shadow in light mode. Avoid nesting these.
  */
 @Composable
 fun SurfaceCard(
@@ -60,15 +70,16 @@ fun SurfaceCard(
     Column(
         modifier
             .pressable(onClick)
-            .shadow(if (c.isDark) 0.dp else elevation * 6, shape, ambientColor = Color(0x14000000), spotColor = Color(0x1F3A2A1A))
+            .shadow(if (c.isDark) 0.dp else elevation * 8, shape, ambientColor = Color(0x0A000000), spotColor = Color(0x12000000))
             .clip(shape)
             .background(color)
+            .border(1.dp, c.line, shape)
             .padding(contentPadding),
         content = content,
     )
 }
 
-/** Small circular icon chip, used for category icons, list leading icons, etc. */
+/** Small rounded-square icon chip, used for category icons, list leading icons, etc. */
 @Composable
 fun IconBadge(
     icon: ImageVector,
@@ -78,7 +89,7 @@ fun IconBadge(
     size: Dp = 40.dp,
     iconSize: Dp = 20.dp,
 ) {
-    Box(modifier.size(size).clip(CircleShape).background(background), contentAlignment = Alignment.Center) {
+    Box(modifier.size(size).clip(Shapes.md).background(background), contentAlignment = Alignment.Center) {
         Icon(icon, contentDescription = null, tint = tint, modifier = Modifier.size(iconSize))
     }
 }
@@ -94,17 +105,20 @@ fun SectionHeader(
 ) {
     Row(modifier.fillMaxWidth(), verticalAlignment = Alignment.Bottom) {
         Column(Modifier.weight(1f)) {
-            Text(title, style = Travel.type.title, color = Travel.colors.ink)
-            if (subtitle != null) Text(subtitle, style = Travel.type.bodySmall, color = Travel.colors.inkFaint)
+            Text(title.voice(), style = Travel.type.title, color = Travel.colors.ink)
+            if (subtitle != null) {
+                Spacer(Modifier.height(2.dp))
+                Text(subtitle, style = Travel.type.bodySmall, color = Travel.colors.inkFaint)
+            }
         }
         if (actionLabel != null && onAction != null) {
             Row(
                 Modifier.clip(Shapes.pill).clickable(onClick = onAction).padding(horizontal = 8.dp, vertical = 4.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Text(actionLabel, style = Travel.type.label, color = Travel.colors.accent)
-                Spacer(Modifier.width(4.dp))
-                Icon(Icons.AutoMirrored.Rounded.ArrowForward, null, tint = Travel.colors.accent, modifier = Modifier.size(14.dp))
+                Text(actionLabel.uppercase(), style = Travel.type.overline, color = Travel.colors.ink)
+                Spacer(Modifier.width(6.dp))
+                Icon(Icons.AutoMirrored.Rounded.ArrowForward, null, tint = Travel.colors.ink, modifier = Modifier.size(13.dp))
             }
         }
     }
@@ -132,9 +146,9 @@ fun StatTile(
             IconBadge(icon, tint, size = 34.dp, iconSize = 18.dp)
             Spacer(Modifier.height(Space.md))
         }
-        Text(value, style = Travel.type.numberSmall, color = Travel.colors.ink, maxLines = 1, overflow = TextOverflow.Ellipsis)
-        Spacer(Modifier.height(2.dp))
-        Text(label, style = Travel.type.bodySmall, color = Travel.colors.inkSoft, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        Text(value, style = Travel.type.numberSmall.copy(fontSize = 22.sp, lineHeight = 26.sp), color = Travel.colors.ink, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        Spacer(Modifier.height(4.dp))
+        Overline(label, color = Travel.colors.inkSoft)
         if (caption != null) Text(caption, style = Travel.type.bodySmall, color = Travel.colors.inkFaint, maxLines = 1)
     }
 }
@@ -169,7 +183,7 @@ fun Hairline(modifier: Modifier = Modifier) {
     Box(modifier.fillMaxWidth().height(1.dp).background(Travel.colors.line))
 }
 
-/** Small rounded status/label pill. */
+/** Small squared-off status label, set in tracked capitals. */
 @Composable
 fun Tag(
     text: String,
@@ -179,14 +193,14 @@ fun Tag(
     icon: ImageVector? = null,
 ) {
     Row(
-        modifier.clip(Shapes.pill).background(background).padding(horizontal = 10.dp, vertical = 4.dp),
+        modifier.clip(Shapes.xs).background(background).padding(horizontal = 8.dp, vertical = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         if (icon != null) {
-            Icon(icon, null, tint = color, modifier = Modifier.size(12.dp))
-            Spacer(Modifier.width(4.dp))
+            Icon(icon, null, tint = color, modifier = Modifier.size(11.dp))
+            Spacer(Modifier.width(5.dp))
         }
-        Text(text, style = Travel.type.label.copy(fontSize = Travel.type.bodySmall.fontSize), color = color, maxLines = 1)
+        Text(text.uppercase(), style = Travel.type.overline.copy(letterSpacing = 0.1.em), color = color, maxLines = 1)
     }
 }
 
@@ -202,11 +216,13 @@ fun ChoicePill(
 ) {
     val c = Travel.colors
     val bg by animateColorAsState(if (selected) c.ink else c.card, label = "pillBg")
-    val fg by animateColorAsState(if (selected) c.background else c.inkSoft, label = "pillFg")
+    val fg by animateColorAsState(if (selected) c.onAccent else c.inkSoft, label = "pillFg")
+    val edge by animateColorAsState(if (selected) c.ink else c.line, label = "pillEdge")
     Row(
         modifier
             .clip(Shapes.pill)
             .background(bg)
+            .border(1.dp, edge, Shapes.pill)
             .clickable(onClick = onClick)
             .padding(horizontal = 14.dp, vertical = 9.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -253,11 +269,35 @@ fun ProgressBar(
     modifier: Modifier = Modifier,
     color: Color = Travel.colors.accent,
     track: Color = Travel.colors.line,
-    height: Dp = 8.dp,
+    height: Dp = 6.dp,
 ) {
     val animated by animateFloatAsState(progress.coerceIn(0f, 1f), label = "progress")
     val barColor = if (progress > 1f) Travel.colors.danger else color
     Box(modifier.fillMaxWidth().height(height).clip(Shapes.pill).background(track)) {
         Box(Modifier.fillMaxWidth(animated).fillMaxHeight().clip(Shapes.pill).background(barColor))
     }
+}
+
+/**
+ * A headline amount: the currency symbol and any decimals are dimmed so the whole number carries
+ * the weight. [text] is an already formatted amount such as "₹5,46,931.50" or "₹2.4L".
+ */
+@Composable
+fun MoneyText(
+    text: String,
+    modifier: Modifier = Modifier,
+    style: androidx.compose.ui.text.TextStyle = Travel.type.number,
+    color: Color = Travel.colors.ink,
+    dim: Color = Travel.colors.inkFaint,
+) {
+    val firstDigit = text.indexOfFirst { it.isDigit() }.coerceAtLeast(0)
+    val lastSep = text.lastIndexOfAny(charArrayOf('.', ','))
+    // Only a separator followed by exactly two digits at the very end is a decimal part.
+    val decimals = if (lastSep >= 0 && text.length - lastSep == 3 && text.substring(lastSep + 1).all { it.isDigit() }) lastSep else text.length
+    val annotated = androidx.compose.ui.text.buildAnnotatedString {
+        pushStyle(androidx.compose.ui.text.SpanStyle(color = dim)); append(text.substring(0, firstDigit)); pop()
+        append(text.substring(firstDigit, decimals))
+        pushStyle(androidx.compose.ui.text.SpanStyle(color = dim)); append(text.substring(decimals)); pop()
+    }
+    Text(annotated, modifier = modifier, style = style, color = color, maxLines = 1, overflow = TextOverflow.Ellipsis)
 }

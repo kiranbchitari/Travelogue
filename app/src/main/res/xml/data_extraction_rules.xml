@@ -1,9 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?>
 <data-extraction-rules>
+    <!--
+      Settings only. Trips are deliberately left out: their photos and documents are far beyond the
+      25 MB cloud quota, and restoring the database without them leaves every cover, photo and receipt
+      pointing at a file that is not there. Use the in-app ZIP export to move trips.
+    -->
     <cloud-backup>
-        <include domain="database" path="." />
         <include domain="file" path="datastore/" />
     </cloud-backup>
+    <!-- A direct phone-to-phone transfer has no size limit, so it carries everything together. -->
     <device-transfer>
         <include domain="database" path="." />
         <include domain="file" path="." />

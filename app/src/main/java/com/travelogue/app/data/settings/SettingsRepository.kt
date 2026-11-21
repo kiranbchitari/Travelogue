@@ -28,6 +28,7 @@ class SettingsRepository(private val context: Context) {
         val currency = stringPreferencesKey("default_currency")
         val demo = booleanPreferencesKey("demo_loaded")
         val rates = stringPreferencesKey("exchange_rates")
+        val demoTravellers = stringPreferencesKey("demo_travellers")
     }
 
     val settings: Flow<AppSettings> = context.dataStore.data.map { p ->
@@ -44,6 +45,14 @@ class SettingsRepository(private val context: Context) {
     suspend fun setTheme(mode: ThemeMode) { context.dataStore.edit { it[Keys.theme] = mode.name } }
     suspend fun setDefaultCurrency(code: String) { context.dataStore.edit { it[Keys.currency] = code.uppercase() } }
     suspend fun setDemoLoaded(v: Boolean) { context.dataStore.edit { it[Keys.demo] = v } }
+    /** Ids of travellers that loading the sample trips created (as opposed to ones that already existed). */
+    suspend fun demoTravellerIds(): List<Long> =
+        context.dataStore.data.first()[Keys.demoTravellers].orEmpty().split(',').mapNotNull { it.toLongOrNull() }
+
+    suspend fun setDemoTravellerIds(ids: List<Long>) {
+        context.dataStore.edit { if (ids.isEmpty()) it.remove(Keys.demoTravellers) else it[Keys.demoTravellers] = ids.joinToString(",") }
+    }
+
     suspend fun clear() { context.dataStore.edit { it.clear() } }
 
     /** Sets (or with a null/zero rate, removes) 1 [from] = [rate] [to]. Any inverse pair is replaced. */

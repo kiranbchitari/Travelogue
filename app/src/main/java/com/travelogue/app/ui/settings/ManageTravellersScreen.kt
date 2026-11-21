@@ -123,7 +123,7 @@ fun ManageTravellersScreen(nav: Nav) {
             "Delete ${r.traveller.name}?",
             if (r.tripCount > 0) "${r.traveller.name} is part of ${r.tripCount} trip(s). Remove them from those trips first." else "They will be removed from your traveller list.",
             "Delete",
-            { vm.delete(r.traveller) { ok -> if (!ok) Toast.makeText(context, "Remove ${r.traveller.name} from their trips first", Toast.LENGTH_LONG).show() } },
+            { vm.delete(r.traveller) { ok -> if (!ok) Toast.makeText(context, "${r.traveller.name} is still on a trip or named in its expenses, so they can't be deleted", Toast.LENGTH_LONG).show() } },
             { deleting = null },
         )
     }

@@ -104,10 +104,11 @@ class BackupRoundTripTest {
         c.backup.discard(session)
     }
 
+    private fun zipOf(vararg entries: Pair<String, String>): File = File(context.cacheDir, "bad-${entries.size}.zip").apply {
+        ZipOutputStream(outputStream()).use { z -> entries.forEach { (n, t) -> z.putNextEntry(ZipEntry(n)); z.write(t.toByteArray()); z.closeEntry() } }
+    }
+
     @Test fun rejectsInvalidArchives() = runBlocking {
-        fun zipOf(vararg entries: Pair<String, String>): File = File(context.cacheDir, "bad-${entries.size}.zip").apply {
-            ZipOutputStream(outputStream()).use { z -> entries.forEach { (n, t) -> z.putNextEntry(ZipEntry(n)); z.write(t.toByteArray()); z.closeEntry() } }
-        }
         suspend fun expectFailure(f: File) {
             try { c.backup.inspect(Uri.fromFile(f)); fail("Expected ${f.name} to be rejected") } catch (_: BackupException) {}
         }
@@ -124,5 +125,63 @@ class BackupRoundTripTest {
             ),
         )
         assertTrue(c.trips.observeTrips().first().none { it.uuid == "u" })
+    }
+
+    @Test fun unsafeTripIdentifierIsRejected() = runBlocking {
+        // The identifier becomes a folder name under media/, so it must not be able to leave it.
+        fun archive(uuid: String) = zipOf(
+            "manifest.json" to """{"format":"travelogue","type":"trip","appVersion":"1","exportedAt":"x","trips":[{"uuid":"$uuid","name":"n","path":""}]}""",
+            "trip.json" to """{"trip":{"uuid":"$uuid","name":"n","destination":"d","startDate":"2026-01-01","endDate":"2026-01-05"}}""",
+        )
+        // Control: the same archive with an ordinary identifier is accepted.
+        c.backup.discard(c.backup.inspect(Uri.fromFile(archive("ok-1"))))
+        for (uuid in listOf(".", "..", "../../databases", "a/b")) {
+            val f = archive(uuid)
+            try { c.backup.inspect(Uri.fromFile(f)); fail("Expected identifier '$uuid' to be rejected") } catch (_: BackupException) {}
+        }
+    }
+
+    @Test fun importCutOffAfterCommitIsFinishedOnNextStart() = runBlocking {
+        c.demo.seed()
+        val trip = db.tripDao().getAll().first { it.name == "Kerala Backwaters" }
+        val mediaRoot = File(context.filesDir, "media")
+        val inPlace = File(mediaRoot, trip.uuid)
+        val staging = File(mediaRoot, ".staging-${trip.uuid}")
+        val files = inPlace.walkTopDown().count { it.isFile }
+        assertTrue(files > 0)
+
+        // The state an import leaves if the app dies between committing the rows and moving the files.
+        assertTrue(inPlace.renameTo(staging))
+        c.backup.recoverInterruptedImports()
+        assertFalse(staging.exists())
+        assertEquals(files, inPlace.walkTopDown().count { it.isFile })
+    }
+
+    @Test fun strayStagingFoldersAreDiscardedWithoutTouchingRealMedia() = runBlocking {
+        c.demo.seed()
+        val trip = db.tripDao().getAll().first { it.name == "Kerala Backwaters" }
+        val mediaRoot = File(context.filesDir, "media")
+        val inPlace = File(mediaRoot, trip.uuid)
+        val files = inPlace.walkTopDown().count { it.isFile }
+
+        // An import that died while still extracting: partial files, rows never committed.
+        val partial = File(mediaRoot, ".staging-${trip.uuid}").apply { mkdirs(); File(this, "half.jpg").writeText("x") }
+        val orphan = File(mediaRoot, ".staging-nobody").apply { mkdirs(); File(this, "half.jpg").writeText("x") }
+        c.backup.recoverInterruptedImports()
+        assertFalse(partial.exists())
+        assertFalse(orphan.exists())
+        assertEquals(files, inPlace.walkTopDown().count { it.isFile })
+    }
+
+    @Test fun removingSampleTripsAlsoRemovesTheTravellersTheyCreated() = runBlocking {
+        c.demo.remove()
+        val mine = c.trips.addTraveller("Zed Keeper")!!
+        val before = db.travellerDao().getAll().map { it.id }.toSet()
+        c.demo.seed()
+        assertTrue(db.travellerDao().getAll().size > before.size)
+        c.demo.remove()
+        assertEquals(before, db.travellerDao().getAll().map { it.id }.toSet())
+        c.trips.deleteTraveller(mine)
+        Unit
     }
 }

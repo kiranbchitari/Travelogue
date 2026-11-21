@@ -75,10 +75,18 @@ class TripRepository(private val db: AppDatabase, private val media: MediaStorag
         return id
     }
 
-    /** Inserts a day row for each date in range that doesn't exist yet. Existing days are kept. */
+    /**
+     * Inserts a day row for each date in range that doesn't exist yet. Days that fall outside the
+     * range after a date change are removed only when they are untouched (no activities, title or
+     * notes); anything the user filled in is kept.
+     */
     suspend fun ensureItineraryDays(tripId: Long, start: LocalDate, end: LocalDate) {
         if (end.isBefore(start)) return
         val dao = db.itineraryDao()
+        dao.getDays(tripId)
+            .filter { (it.date.isBefore(start) || it.date.isAfter(end)) && it.title.isBlank() && it.notes.isBlank() }
+            .filter { dao.getActivitiesForDay(it.id).isEmpty() }
+            .forEach { dao.deleteDay(it.id) }
         var d = start
         var guard = 0
         while (!d.isAfter(end) && guard < 366) {
@@ -144,9 +152,13 @@ class TripRepository(private val db: AppDatabase, private val media: MediaStorag
         if (n.isNotEmpty()) travellers.update(t.copy(name = n))
     }
 
-    /** Returns false (and keeps the traveller) if they are still part of any trip. */
+    /**
+     * Returns false (and keeps the traveller) if they are still part of any trip, or if any expense,
+     * split share or settlement still names them. Deleting would cascade those rows away and leave
+     * the remaining balances no longer summing to zero.
+     */
     suspend fun deleteTraveller(id: Long): Boolean {
-        if (travellers.tripCount(id) > 0) return false
+        if (travellers.tripCount(id) > 0 || travellers.moneyReferenceCount(id) > 0) return false
         travellers.delete(id)
         return true
     }

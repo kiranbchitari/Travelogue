@@ -1,6 +1,7 @@
 package com.travelogue.app.core.designsystem.components
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.text.KeyboardOptions
@@ -16,6 +17,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.input.ImeAction
@@ -36,7 +38,7 @@ import java.time.ZoneOffset
 @Composable
 fun FormSection(title: String, modifier: Modifier = Modifier, content: @Composable ColumnScope.() -> Unit) {
     Column(modifier.fillMaxWidth()) {
-        Overline(title, Modifier.padding(start = 4.dp, bottom = Space.sm))
+        Text(title.voice(), style = Travel.type.title, color = Travel.colors.ink, modifier = Modifier.padding(start = 2.dp, bottom = Space.md))
         Column(verticalArrangement = Arrangement.spacedBy(Space.md), content = content)
     }
 }
@@ -45,7 +47,7 @@ fun FormSection(title: String, modifier: Modifier = Modifier, content: @Composab
 @Composable
 private fun FieldFrame(label: String, error: String?, modifier: Modifier, content: @Composable () -> Unit) {
     Column(modifier.fillMaxWidth()) {
-        Text(label, style = Travel.type.label, color = Travel.colors.inkSoft, modifier = Modifier.padding(start = 4.dp, bottom = 6.dp))
+        Overline(label, Modifier.padding(start = 2.dp, bottom = 8.dp), color = Travel.colors.inkSoft)
         content()
         if (error != null) {
             Text(error, style = Travel.type.bodySmall, color = Travel.colors.danger, modifier = Modifier.padding(start = 4.dp, top = 4.dp))
@@ -105,7 +107,7 @@ fun FormField(
         TextField(
             value = value,
             onValueChange = onValueChange,
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier.fillMaxWidth().border(1.dp, if (error != null) Travel.colors.danger else Travel.colors.line, Shapes.md),
             placeholder = { Text(placeholder, style = Travel.type.bodyLarge) },
             textStyle = Travel.type.bodyLarge,
             singleLine = singleLine,
@@ -167,6 +169,7 @@ fun PickerField(
                 .heightIn(min = 56.dp)
                 .clip(Shapes.md)
                 .background(Travel.colors.card)
+                .border(1.dp, if (error != null) Travel.colors.danger else Travel.colors.line, Shapes.md)
                 .clickable(onClick = onClick)
                 .padding(horizontal = 16.dp),
             verticalAlignment = Alignment.CenterVertically,
@@ -295,7 +298,7 @@ fun <T> DropdownField(
 @Composable
 fun SwitchRow(label: String, checked: Boolean, onCheckedChange: (Boolean) -> Unit, modifier: Modifier = Modifier, description: String? = null) {
     Row(
-        modifier.fillMaxWidth().clip(Shapes.md).background(Travel.colors.card).clickable { onCheckedChange(!checked) }.padding(horizontal = 16.dp, vertical = 12.dp),
+        modifier.fillMaxWidth().clip(Shapes.md).background(Travel.colors.card).border(1.dp, Travel.colors.line, Shapes.md).clickable { onCheckedChange(!checked) }.padding(horizontal = 16.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Column(Modifier.weight(1f)) {
@@ -335,7 +338,7 @@ fun RatingStars(rating: Int, modifier: Modifier = Modifier, max: Int = 5, size: 
 @Composable
 fun RatingInput(label: String, rating: Int, onRatingChange: (Int) -> Unit, modifier: Modifier = Modifier, size: Dp = 30.dp) {
     Row(
-        modifier.fillMaxWidth().clip(Shapes.md).background(Travel.colors.card).padding(horizontal = 16.dp, vertical = 10.dp),
+        modifier.fillMaxWidth().clip(Shapes.md).background(Travel.colors.card).border(1.dp, Travel.colors.line, Shapes.md).padding(horizontal = 16.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Text(label, style = Travel.type.body, color = Travel.colors.inkSoft, modifier = Modifier.weight(1f))
@@ -353,7 +356,13 @@ fun RatingInput(label: String, rating: Int, onRatingChange: (Int) -> Unit, modif
     }
 }
 
-/** Free-form tag/name entry: type and press add; shows removable chips. */
+/**
+ * Free-form tag/name entry: type and press add; shows removable chips.
+ *
+ * Text that is still in the box has not become a chip yet. [onDraftChange] reports it (trimmed, ""
+ * once it is committed or cleared) so the caller can include it when saving; see [withDraft].
+ * Without that, typing a last tag and tapping Save straight away would silently drop it.
+ */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun ChipInput(
@@ -363,20 +372,27 @@ fun ChipInput(
     modifier: Modifier = Modifier,
     placeholder: String = "Type and press +",
     suggestions: List<String> = emptyList(),
+    onDraftChange: (String) -> Unit = {},
 ) {
     var text by remember { mutableStateOf("") }
+    fun type(raw: String) {
+        text = raw
+        onDraftChange(raw.trim())
+    }
     fun add(v: String) {
-        val t = v.trim().trimEnd(',')
+        val t = v.trim().trimEnd(',').trim()
         if (t.isNotEmpty() && values.none { it.equals(t, true) }) onValuesChange(values + t)
-        text = ""
+        type("")
     }
     Column(modifier) {
         FormField(
             label = label,
             value = text,
-            onValueChange = { if (it.endsWith(",")) add(it) else text = it },
+            onValueChange = { if (it.endsWith(",")) add(it) else type(it) },
             placeholder = placeholder,
             capitalization = KeyboardCapitalization.Words,
+            // Moving on to another field turns the text into a chip.
+            modifier = Modifier.onFocusChanged { if (!it.isFocused && text.isNotBlank()) add(text) },
             trailing = {
                 TextButton(onClick = { add(text) }, enabled = text.isNotBlank()) { Text("Add", color = Travel.colors.accent) }
             },
@@ -389,9 +405,9 @@ fun ChipInput(
                     Modifier.clip(Shapes.pill).background(Travel.colors.ink).clickable { onValuesChange(values - v) }.padding(start = 12.dp, end = 8.dp, top = 7.dp, bottom = 7.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    Text(v, style = Travel.type.label, color = Travel.colors.background)
+                    Text(v, style = Travel.type.label, color = Travel.colors.onAccent)
                     Spacer(Modifier.width(4.dp))
-                    Icon(Icons.Rounded.Close, "Remove $v", tint = Travel.colors.background, modifier = Modifier.size(14.dp))
+                    Icon(Icons.Rounded.Close, "Remove $v", tint = Travel.colors.onAccent, modifier = Modifier.size(14.dp))
                 }
             }
             remaining.forEach { s ->
@@ -399,9 +415,15 @@ fun ChipInput(
                     "+ $s",
                     style = Travel.type.label,
                     color = Travel.colors.inkSoft,
-                    modifier = Modifier.clip(Shapes.pill).background(Travel.colors.backgroundDeep).clickable { add(s) }.padding(horizontal = 12.dp, vertical = 7.dp),
+                    modifier = Modifier.clip(Shapes.pill).border(1.dp, Travel.colors.line, Shapes.pill).clickable { add(s) }.padding(horizontal = 12.dp, vertical = 7.dp),
                 )
             }
         }
     }
+}
+
+/** The chips plus whatever was still typed in a [ChipInput] when the form was saved. */
+fun List<String>.withDraft(draft: String): List<String> {
+    val t = draft.trim().trimEnd(',').trim()
+    return if (t.isNotEmpty() && none { it.equals(t, true) }) this + t else this
 }

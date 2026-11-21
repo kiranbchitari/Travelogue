@@ -10,6 +10,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.createSavedStateHandle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
@@ -28,7 +29,15 @@ fun appContainer(): AppContainer = (LocalContext.current.applicationContext as T
 @Composable
 inline fun <reified VM : ViewModel> appViewModel(key: String? = null, crossinline create: AppContainer.() -> VM): VM {
     val container = appContainer()
-    return viewModel(key = key, factory = viewModelFactory { initializer { container.create() } })
+    return viewModel(
+        key = key,
+        factory = viewModelFactory {
+            initializer {
+                // Editors keep their unsaved form across process death; see DraftHolder.
+                container.create().also { vm -> if (vm is DraftHolder) keepDraft(vm, createSavedStateHandle()) }
+            }
+        },
+    )
 }
 
 /** Content padding for top-level tab screens so the last item clears the floating bottom bar. */

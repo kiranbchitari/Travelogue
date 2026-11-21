@@ -1,5 +1,6 @@
 package com.travelogue.app.ui.trips
 
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -110,11 +111,11 @@ private fun SearchField(value: String, onChange: (String) -> Unit, modifier: Mod
     TextField(
         value = value,
         onValueChange = onChange,
-        modifier = modifier.fillMaxWidth(),
+        modifier = modifier.fillMaxWidth().border(1.dp, Travel.colors.line, Shapes.md),
         placeholder = { Text("Search trips, places, countries", style = Travel.type.body) },
         textStyle = Travel.type.bodyLarge,
         singleLine = true,
-        shape = Shapes.pill,
+        shape = Shapes.md,
         colors = fieldColors(),
         leadingIcon = { Icon(Icons.Rounded.Search, null, modifier = Modifier.size(20.dp)) },
         trailingIcon = if (value.isNotEmpty()) {

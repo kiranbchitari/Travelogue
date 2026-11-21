@@ -14,7 +14,7 @@ import com.travelogue.app.R
 private fun fraunces(weight: Int) = Font(
     R.font.fraunces,
     weight = FontWeight(weight),
-    variationSettings = FontVariation.Settings(FontVariation.weight(weight), FontVariation.Setting("SOFT", 50f)),
+    variationSettings = FontVariation.Settings(FontVariation.weight(weight), FontVariation.Setting("SOFT", 0f), FontVariation.Setting("WONK", 0f)),
 )
 
 private fun jakarta(weight: Int) = Font(
@@ -23,7 +23,7 @@ private fun jakarta(weight: Int) = Font(
     variationSettings = FontVariation.Settings(FontVariation.weight(weight)),
 )
 
-/** Editorial serif for headlines and numbers. */
+/** High-contrast serif for headlines and numbers, set tight and heavy. */
 val Serif = FontFamily(fraunces(400), fraunces(500), fraunces(600), fraunces(700))
 
 /** Clean humanist sans for UI and body text. */
@@ -46,17 +46,17 @@ data class TravelTypography(
 )
 
 val DefaultTravelTypography = TravelTypography(
-    display = TextStyle(fontFamily = Serif, fontWeight = FontWeight(500), fontSize = 38.sp, lineHeight = 42.sp, letterSpacing = (-0.02).em),
-    headline = TextStyle(fontFamily = Serif, fontWeight = FontWeight(500), fontSize = 28.sp, lineHeight = 33.sp, letterSpacing = (-0.01).em),
-    title = TextStyle(fontFamily = Serif, fontWeight = FontWeight(600), fontSize = 20.sp, lineHeight = 26.sp),
-    titleSmall = TextStyle(fontFamily = Sans, fontWeight = FontWeight(600), fontSize = 16.sp, lineHeight = 22.sp),
+    display = TextStyle(fontFamily = Serif, fontWeight = FontWeight(600), fontSize = 36.sp, lineHeight = 39.sp, letterSpacing = (-0.035).em),
+    headline = TextStyle(fontFamily = Serif, fontWeight = FontWeight(600), fontSize = 27.sp, lineHeight = 31.sp, letterSpacing = (-0.03).em),
+    title = TextStyle(fontFamily = Serif, fontWeight = FontWeight(600), fontSize = 20.sp, lineHeight = 25.sp, letterSpacing = (-0.02).em),
+    titleSmall = TextStyle(fontFamily = Sans, fontWeight = FontWeight(600), fontSize = 15.sp, lineHeight = 21.sp, letterSpacing = (-0.005).em),
     bodyLarge = TextStyle(fontFamily = Sans, fontWeight = FontWeight(400), fontSize = 16.sp, lineHeight = 24.sp),
     body = TextStyle(fontFamily = Sans, fontWeight = FontWeight(400), fontSize = 14.sp, lineHeight = 21.sp),
     bodySmall = TextStyle(fontFamily = Sans, fontWeight = FontWeight(400), fontSize = 12.sp, lineHeight = 17.sp),
     label = TextStyle(fontFamily = Sans, fontWeight = FontWeight(600), fontSize = 13.sp, lineHeight = 18.sp),
-    overline = TextStyle(fontFamily = Sans, fontWeight = FontWeight(600), fontSize = 11.sp, lineHeight = 14.sp, letterSpacing = 0.12.em),
-    number = TextStyle(fontFamily = Serif, fontWeight = FontWeight(500), fontSize = 30.sp, lineHeight = 34.sp, letterSpacing = (-0.01).em),
-    numberSmall = TextStyle(fontFamily = Serif, fontWeight = FontWeight(600), fontSize = 18.sp, lineHeight = 22.sp),
+    overline = TextStyle(fontFamily = Sans, fontWeight = FontWeight(700), fontSize = 10.sp, lineHeight = 14.sp, letterSpacing = 0.18.em),
+    number = TextStyle(fontFamily = Serif, fontWeight = FontWeight(600), fontSize = 32.sp, lineHeight = 36.sp, letterSpacing = (-0.03).em),
+    numberSmall = TextStyle(fontFamily = Serif, fontWeight = FontWeight(600), fontSize = 18.sp, lineHeight = 22.sp, letterSpacing = (-0.02).em),
     journal = TextStyle(fontFamily = Serif, fontWeight = FontWeight(400), fontSize = 17.sp, lineHeight = 28.sp),
 )
 

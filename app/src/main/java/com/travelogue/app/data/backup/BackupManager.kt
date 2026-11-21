@@ -14,6 +14,7 @@ import com.travelogue.app.data.db.enumOr
 import com.travelogue.app.data.repository.ExpenseRepository
 import com.travelogue.app.data.settings.SettingsRepository
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.SerializationException
 import java.io.File
@@ -228,7 +229,11 @@ class BackupManager(
             if (n.contains("..") || n.startsWith("/") || n.contains('\\') || n.contains(':')) throw BackupException("The archive contains an unsafe file path: $n")
             if (e.isDirectory) continue
             val ext = n.substringAfterLast('.', "").lowercase()
-            if (ext !in ALLOWED_EXTENSIONS) throw BackupException("Unsupported file type in archive: ${n.substringAfterLast('/')}")
+            // Booking attachments keep whatever type the user attached (tiff, docx, …); they are only
+            // ever handed to another app to open. Everything else must be a type the app itself reads.
+            val isDocument = n.startsWith("documents/") || n.contains("/documents/")
+            val allowed = if (isDocument) ext.matches(DOCUMENT_EXTENSION) else ext in ALLOWED_EXTENSIONS
+            if (!allowed) throw BackupException("Unsupported file type in archive: ${n.substringAfterLast('/')}")
             if (e.size > MAX_ENTRY_BYTES) throw BackupException("A file in the archive is too large: ${n.substringAfterLast('/')}")
             declaredTotal += e.size.coerceAtLeast(0)
         }
@@ -273,7 +278,8 @@ class BackupManager(
 
     private fun validateArchive(a: TripArchive) {
         val t = a.trip
-        if (t.uuid.isBlank()) throw BackupException("A trip in the archive has no identifier.")
+        // The identifier becomes a folder name under media/, so it must not be able to climb out of it.
+        if (!SAFE_UUID.matches(t.uuid)) throw BackupException("A trip in the archive has an invalid identifier.")
         if (t.name.isBlank()) throw BackupException("A trip in the archive has no name.")
         if (t.endDate.isBefore(t.startDate)) throw BackupException("“${t.name}” has an end date before its start date.")
         if (t.budget < 0 || a.expenses.any { it.amount.isNaN() || it.amount.isInfinite() }) throw BackupException("“${t.name}” contains invalid amounts.")
@@ -307,7 +313,7 @@ class BackupManager(
      * Restores the trips in [session]. Files are extracted to a staging folder first; the database
      * work for each trip runs in one transaction, so a failure never leaves a half-imported trip.
      */
-    suspend fun import(session: ImportSession, strategy: DuplicateStrategy, progress: Progress = { _, _ -> }): ImportResult = withContext(Dispatchers.IO) {
+    suspend fun import(session: ImportSession, strategy: DuplicateStrategy, progress: Progress = { _, _ -> }): ImportResult = withContext(Dispatchers.IO) { stagingLock.withLock {
         val warnings = mutableListOf<String>()
         var imported = 0
         var skipped = 0
@@ -340,7 +346,56 @@ class BackupManager(
         }
         progress(1f, "Done")
         ImportResult(imported, skipped, warnings)
+    } }
+
+    /** Imports and the start-up recovery below both move files through staging folders; never at once. */
+    private val stagingLock = kotlinx.coroutines.sync.Mutex()
+
+    /**
+     * Finishes or discards imports that were cut off when the app was killed. Called once at start-up.
+     *
+     * An import extracts files into `media/.staging-<uuid>`, commits the trip's rows, and only then
+     * moves the folder to `media/<uuid>`. If the process dies in between, the rows are saved but
+     * their files are still in staging, so every photo of that trip would be broken. Which folder is
+     * the right one is decided from the database itself: whichever of the two holds more of the files
+     * the trip's rows actually reference wins. A staging folder left by an import that died earlier,
+     * before its rows were committed, matches nothing (or fewer files than the folder already in
+     * place) and is deleted.
+     */
+    suspend fun recoverInterruptedImports() = withContext(Dispatchers.IO) {
+        stagingLock.withLock {
+            val mediaRoot = File(media.root, MediaStorage.MEDIA_DIR)
+            val leftovers = mediaRoot.listFiles { f -> f.isDirectory && f.name.startsWith(STAGING_PREFIX) } ?: return@withLock
+            for (staging in leftovers) {
+                runCatching {
+                    val uuid = staging.name.removePrefix(STAGING_PREFIX)
+                    val finalDir = media.tripDir(uuid)
+                    val prefix = "${MediaStorage.MEDIA_DIR}/$uuid/"
+                    val referenced = db.tripDao().getByUuid(uuid)?.let { referencedFiles(it) }.orEmpty()
+                        .filter { it.startsWith(prefix) }.map { it.removePrefix(prefix) }
+                    val inStaging = referenced.count { File(staging, it).isFile }
+                    val inPlace = referenced.count { File(finalDir, it).isFile }
+                    if (inStaging > inPlace) {
+                        finalDir.deleteRecursively()
+                        if (!staging.renameTo(finalDir)) {
+                            staging.copyRecursively(finalDir, overwrite = true)
+                            staging.deleteRecursively()
+                        }
+                    } else {
+                        staging.deleteRecursively()
+                    }
+                }
+            }
+        }
     }
+
+    /** Every stored file a trip's rows point at, as paths relative to the app's files folder. */
+    private suspend fun referencedFiles(trip: TripEntity): List<String> =
+        listOfNotNull(trip.coverPath) +
+            db.expenseDao().getForTrip(trip.id).mapNotNull { it.receiptPath } +
+            db.itineraryDao().getActivities(trip.id).mapNotNull { it.photoPath } +
+            db.photoDao().getForTrip(trip.id).map { it.relativePath } +
+            db.tripDao().getDocuments(trip.id).map { it.relativePath }
 
     private suspend fun importTrip(
         zip: ZipFile,
@@ -352,7 +407,7 @@ class BackupManager(
         progress: Progress,
     ): List<String> {
         val warnings = mutableListOf<String>()
-        val staging = File(media.root, "${MediaStorage.MEDIA_DIR}/.staging-$uuid").apply { deleteRecursively(); mkdirs() }
+        val staging = File(media.root, "${MediaStorage.MEDIA_DIR}/$STAGING_PREFIX$uuid").apply { deleteRecursively(); mkdirs() }
         val finalDir = media.tripDir(uuid)
         val finalRel = "${MediaStorage.MEDIA_DIR}/$uuid"
 
@@ -360,14 +415,20 @@ class BackupManager(
         val referenced = (listOfNotNull(a.trip.coverPath) + a.expenses.mapNotNull { it.receiptPath } + a.activities.mapNotNull { it.photoPath } +
             a.photos.map { it.relativePath } + a.documents.map { it.relativePath }).distinct()
         val available = HashSet<String>()
-        referenced.forEachIndexed { i, p ->
-            val entry = zip.getEntry(prefix + p)
-            if (entry == null) { warnings += "Missing file: ${p.substringAfterLast('/')}"; return@forEachIndexed }
-            val target = File(staging, localSubPath(p))
-            target.parentFile?.mkdirs()
-            zip.getInputStream(entry).use { i2 -> target.outputStream().use { o -> copyLimited(i2, o, MAX_ENTRY_BYTES) } }
-            available += p
-            progress(0.7f * (i + 1) / referenced.size.coerceAtLeast(1), "Restoring photos ${i + 1} of ${referenced.size}")
+        try {
+            referenced.forEachIndexed { i, p ->
+                val entry = zip.getEntry(prefix + p)
+                if (entry == null) { warnings += "Missing file: ${p.substringAfterLast('/')}"; return@forEachIndexed }
+                val target = File(staging, localSubPath(p))
+                target.parentFile?.mkdirs()
+                zip.getInputStream(entry).use { i2 -> target.outputStream().use { o -> copyLimited(i2, o, MAX_ENTRY_BYTES) } }
+                available += p
+                progress(0.7f * (i + 1) / referenced.size.coerceAtLeast(1), "Restoring photos ${i + 1} of ${referenced.size}")
+            }
+        } catch (e: Exception) {
+            // A full disk or an oversized entry must not leave a half-filled staging folder behind.
+            staging.deleteRecursively()
+            throw e
         }
         fun local(p: String?): String? = p?.takeIf { it in available }?.let { "$finalRel/${localSubPath(it)}" }
 
@@ -521,6 +582,9 @@ class BackupManager(
         const val MAX_JSON_BYTES = 50L * 1024 * 1024
         const val MAX_ENTRIES = 50_000
         val ALLOWED_EXTENSIONS = setOf("json", "jpg", "jpeg", "png", "webp", "heic", "heif", "gif", "pdf", "bin")
+        private const val STAGING_PREFIX = ".staging-"
+        private val DOCUMENT_EXTENSION = Regex("[a-z0-9]{1,8}")
+        private val SAFE_UUID = Regex("^[A-Za-z0-9_-]{1,64}$")
         private val SAFE_ARCHIVE_PATH = Regex("^(images/[A-Za-z0-9_-]+|documents)/[A-Za-z0-9._-]+$")
 
         fun suggestedFileName(tripName: String): String {

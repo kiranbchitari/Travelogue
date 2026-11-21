@@ -67,8 +67,8 @@ fun TripOverviewTab(
                     horizontalArrangement = Arrangement.spacedBy(Space.md),
                 ) {
                     QuickLink(Icons.Rounded.PieChart, "Finances", "Budget & splits", Travel.colors.accent, Modifier.weight(1f)) { nav.tripFinance(trip.id) }
-                    QuickLink(Icons.Rounded.AutoStories, "Trip story", "Timeline", Travel.colors.secondary, Modifier.weight(1f)) { nav.tripTimeline(trip.id) }
-                    QuickLink(Icons.Rounded.Collections, "Gallery", "All photos", Travel.colors.gold, Modifier.weight(1f)) { nav.tripGallery(trip.id) }
+                    QuickLink(Icons.Rounded.AutoStories, "Trip story", "Timeline", Travel.colors.accent, Modifier.weight(1f)) { nav.tripTimeline(trip.id) }
+                    QuickLink(Icons.Rounded.Collections, "Gallery", "All photos", Travel.colors.accent, Modifier.weight(1f)) { nav.tripGallery(trip.id) }
                 }
             }
 
@@ -183,7 +183,7 @@ private fun BudgetCard(trip: TripEntity, s: TripDetailState, onClick: () -> Unit
             Column(Modifier.weight(1f)) {
                 Overline("Total spent")
                 Spacer(Modifier.height(2.dp))
-                Text(Fmt.money(s.total, trip.currency), style = Travel.type.number, color = c.ink, maxLines = 1)
+                MoneyText(Fmt.money(s.total, trip.currency))
                 Spacer(Modifier.height(4.dp))
                 if (trip.budget > 0) {
                     val remaining = trip.budget - s.total
@@ -212,11 +212,13 @@ private fun BudgetCard(trip: TripEntity, s: TripDetailState, onClick: () -> Unit
 
 @Composable
 private fun QuickLink(icon: ImageVector, title: String, caption: String, tint: Color, modifier: Modifier, onClick: () -> Unit) {
-    SurfaceCard(modifier, onClick = onClick, color = tint.copy(alpha = 0.1f), elevation = 0.dp, contentPadding = PaddingValues(Space.md)) {
-        Icon(icon, null, tint = tint, modifier = Modifier.size(22.dp))
-        Spacer(Modifier.height(Space.md))
-        Text(title, style = Travel.type.label, color = Travel.colors.ink, maxLines = 1)
-        Text(caption, style = Travel.type.bodySmall, color = Travel.colors.inkSoft, maxLines = 1, overflow = TextOverflow.Ellipsis)
+    // Solid ink tiles: the one block of contrast on the overview, below the white stat cards.
+    val c = Travel.colors
+    SurfaceCard(modifier, onClick = onClick, color = c.accent, elevation = 0.dp, contentPadding = PaddingValues(Space.md)) {
+        Icon(icon, null, tint = if (tint == c.accent) c.onAccent else tint, modifier = Modifier.size(20.dp))
+        Spacer(Modifier.height(Space.lg))
+        Text(title.voice(), style = Travel.type.label, color = c.onAccent, maxLines = 1)
+        Text(caption, style = Travel.type.bodySmall, color = c.onAccent.copy(alpha = 0.6f), maxLines = 1, overflow = TextOverflow.Ellipsis)
     }
 }
 

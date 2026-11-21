@@ -31,5 +31,5 @@ class AppContainer(context: Context) {
     val diary: DiaryRepository by lazy { DiaryRepository(database, photos) }
 
     val backup: BackupManager by lazy { BackupManager(appContext, database, media, expenses, settings) }
-    val demo: DemoDataSeeder by lazy { DemoDataSeeder(appContext, database, media, trips, expenses, journal, diary, photos) }
+    val demo: DemoDataSeeder by lazy { DemoDataSeeder(appContext, database, media, trips, expenses, journal, diary, photos, settings) }
 }

@@ -13,6 +13,8 @@ class TravelogueApp : Application() {
         container = AppContainer(this)
         container.appScope.launch {
             container.expenses.ensureDefaultCategories()
+            // An import cut off by the app being killed may have left a trip's files in staging.
+            runCatching { container.backup.recoverInterruptedImports() }
             // Leftover camera captures are copied into trip storage when saved; clear the temp folder.
             cacheDir.resolve("camera").listFiles()?.filter { System.currentTimeMillis() - it.lastModified() > 86_400_000 }?.forEach { it.delete() }
         }

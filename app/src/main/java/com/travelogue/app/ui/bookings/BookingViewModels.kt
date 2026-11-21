@@ -1,5 +1,10 @@
 package com.travelogue.app.ui.bookings
 
+import com.travelogue.app.ui.common.read
+import com.travelogue.app.ui.common.DraftSlot
+import com.travelogue.app.ui.common.DraftHolder
+import androidx.core.os.bundleOf
+import android.os.Bundle
 import android.net.Uri
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
@@ -54,7 +59,7 @@ data class BookingForm(
     val currency: String = "INR",
     val paymentStatus: PaymentStatus = PaymentStatus.PAID,
     val notes: String = "",
-)
+) : java.io.Serializable
 
 data class BookingErrors(
     val title: String? = null,
@@ -70,7 +75,7 @@ private fun dateTime(d: LocalDate?, t: LocalTime?): LocalDateTime? = d?.atTime(t
 fun BookingForm.validate(): BookingErrors {
     val amt = amount.trim()
     val dep = dateTime(departureDate, departureTime)
-    val arr = dateTime(arrivalDate, arrivalTime)
+    val arr = dateTime(arrivalDate ?: departureDate.takeIf { arrivalTime != null }, arrivalTime)
     return BookingErrors(
         title = if (title.isBlank()) "Give the booking a title" else null,
         amount = when {
@@ -80,7 +85,11 @@ fun BookingForm.validate(): BookingErrors {
             else -> null
         },
         currency = if (!currency.matches(Regex("[A-Za-z]{3}"))) "Use a 3-letter currency code" else null,
-        arrival = if (dep != null && arr != null && arr.isBefore(dep)) "Arrival must be after departure" else null,
+        arrival = when {
+            arrivalTime != null && arr == null -> "Pick a date for the arrival time"
+            dep != null && arr != null && arr.isBefore(dep) -> "Arrival must be after departure"
+            else -> null
+        },
     )
 }
 
@@ -91,7 +100,7 @@ class BookingEditorViewModel(
     private val media: MediaStorage,
     val tripId: Long,
     val bookingId: Long,
-) : ViewModel() {
+) : ViewModel(), DraftHolder {
     val isNew = bookingId == 0L
     var form by mutableStateOf(BookingForm())
         private set
@@ -118,9 +127,24 @@ class BookingEditorViewModel(
     private val _messages = MutableSharedFlow<String>(extraBufferCapacity = 4)
     val messages: SharedFlow<String> = _messages
 
+    /** Saved attachments removed in this edit. They are only deleted for real when the edit is saved. */
+    private val removedSaved = MutableStateFlow<Set<Long>>(emptySet())
+
     val attachments: StateFlow<List<DocumentEntity>> =
         (if (isNew) flowOf(emptyList()) else trips.observeDocumentsFor(DocumentOwner.BOOKING, bookingId))
+            .combine(removedSaved) { list, gone -> list.filter { it.id !in gone } }
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    private val draft = DraftSlot(::applyDraft)
+    override fun restoreDraft(draft: Bundle) = this.draft.offer(draft)
+    override fun saveDraft(): Bundle = if (!draft.ready || finished) Bundle() else
+        bundleOf("form" to form, "addToExpenses" to addToExpensesChoice, "removedSaved" to HashSet(removedSaved.value))
+
+    private fun applyDraft(b: Bundle) {
+        form = b.read("form") ?: form
+        addToExpensesChoice = b.read("addToExpenses")
+        removedSaved.value = b.read<HashSet<Long>>("removedSaved") ?: removedSaved.value
+    }
 
     init {
         viewModelScope.launch {
@@ -136,12 +160,13 @@ class BookingEditorViewModel(
                         from = b.fromPlace, to = b.toPlace,
                         departureDate = b.departure?.toLocalDate(), departureTime = b.departure?.toLocalTime()?.takeIf { it != LocalTime.MIDNIGHT },
                         arrivalDate = b.arrival?.toLocalDate(), arrivalTime = b.arrival?.toLocalTime()?.takeIf { it != LocalTime.MIDNIGHT },
-                        amount = if (b.amount == 0.0) "" else com.travelogue.app.core.util.Fmt.number(b.amount),
+                        amount = if (b.amount == 0.0) "" else com.travelogue.app.ui.expenses.plainNumber(b.amount),
                         currency = b.currency, paymentStatus = b.paymentStatus, notes = b.notes,
                     )
                 }
             }
             loaded = true
+            draft.ready()
         }
     }
 
@@ -157,7 +182,7 @@ class BookingEditorViewModel(
 
     fun pendingName(uri: Uri): String = pendingNames.getOrPut(uri) { media.displayName(uri) ?: "Attachment" }
 
-    fun removeSaved(doc: DocumentEntity) { viewModelScope.launch { trips.deleteDocument(doc.id) } }
+    fun removeSaved(doc: DocumentEntity) { removedSaved.value += doc.id }
 
     fun fileFor(doc: DocumentEntity): File = media.file(doc.relativePath)
 
@@ -183,7 +208,7 @@ class BookingEditorViewModel(
                     fromPlace = f.from.trim(),
                     toPlace = f.to.trim(),
                     departure = departure,
-                    arrival = dateTime(f.arrivalDate, f.arrivalTime),
+                    arrival = dateTime(f.arrivalDate ?: f.departureDate.takeIf { f.arrivalTime != null }, f.arrivalTime),
                     amount = amount,
                     currency = f.currency.uppercase(),
                     paymentStatus = f.paymentStatus,
@@ -191,13 +216,13 @@ class BookingEditorViewModel(
                 )
                 val alsoExpense = isNew && addToExpenses && amount > 0
                 journal.saveBooking(row, pending.toList())
+                removedSaved.value.forEach { trips.deleteDocument(it) }
                 pending.clear()
                 if (alsoExpense) recordExpense(row, departure)
                 finished = true
             } catch (e: Exception) {
-                _messages.tryEmit(e.message ?: "Couldn't save this booking")
-            } finally {
                 saving = false
+                _messages.tryEmit(e.message ?: "Couldn't save this booking")
             }
         }
     }

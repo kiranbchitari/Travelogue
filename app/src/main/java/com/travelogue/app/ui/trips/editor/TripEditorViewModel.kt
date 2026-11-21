@@ -1,5 +1,11 @@
 package com.travelogue.app.ui.trips.editor
 
+import com.travelogue.app.ui.common.read
+import com.travelogue.app.ui.common.DraftSlot
+import com.travelogue.app.ui.common.DraftHolder
+import androidx.core.os.bundleOf
+import android.os.Bundle
+import com.travelogue.app.core.designsystem.components.withDraft
 import android.net.Uri
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -29,7 +35,7 @@ data class TripFormErrors(
     val any: Boolean get() = listOf(name, destination, startDate, endDate, travellerCount, budget).any { it != null }
 }
 
-class TripEditorViewModel(private val c: AppContainer, val tripId: Long) : ViewModel() {
+class TripEditorViewModel(private val c: AppContainer, val tripId: Long) : ViewModel(), DraftHolder {
     val isNew = tripId == 0L
 
     var loading by mutableStateOf(!isNew); private set
@@ -63,6 +69,26 @@ class TripEditorViewModel(private val c: AppContainer, val tripId: Long) : ViewM
         .map { list -> list.map { it.name } }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
+    private val draft = DraftSlot(::applyDraft)
+    override fun restoreDraft(draft: Bundle) = this.draft.offer(draft)
+    override fun saveDraft(): Bundle = if (!draft.ready || notFound) Bundle() else bundleOf(
+        "name" to name, "destination" to destination, "country" to country, "startDate" to startDate, "endDate" to endDate,
+        "travellerCount" to travellerCount, "travellerNames" to ArrayList(travellerNames), "description" to description, "notes" to notes,
+        "status" to status, "statusTouched" to statusTouched, "budget" to budget, "currency" to currency, "travelType" to travelType,
+        "removeCover" to removeCover,
+    )
+
+    private fun applyDraft(b: Bundle) {
+        name = b.read("name") ?: name; destination = b.read("destination") ?: destination; country = b.read("country") ?: country
+        startDate = b.read("startDate"); endDate = b.read("endDate")
+        travellerCount = b.read("travellerCount") ?: travellerCount
+        travellerNames = b.read<ArrayList<String>>("travellerNames") ?: travellerNames
+        description = b.read("description") ?: description; notes = b.read("notes") ?: notes
+        status = b.read("status") ?: status; statusTouched = b.getBoolean("statusTouched", statusTouched)
+        budget = b.read("budget") ?: budget; currency = b.read("currency") ?: currency; travelType = b.read("travelType") ?: travelType
+        if (b.getBoolean("removeCover")) { removeCover = true; savedCoverPath = null }
+    }
+
     init {
         viewModelScope.launch {
             if (isNew) {
@@ -82,7 +108,7 @@ class TripEditorViewModel(private val c: AppContainer, val tripId: Long) : ViewM
                     description = t.description
                     notes = t.notes
                     status = t.status
-                    budget = if (t.budget > 0) com.travelogue.app.core.util.Fmt.number(t.budget) else ""
+                    budget = if (t.budget > 0) com.travelogue.app.ui.expenses.plainNumber(t.budget) else ""
                     currency = t.currency
                     travelType = t.travelType
                     savedCoverPath = t.coverPath
@@ -90,6 +116,7 @@ class TripEditorViewModel(private val c: AppContainer, val tripId: Long) : ViewM
                 }
             }
             loading = false
+            draft.ready()
         }
     }
 
@@ -117,6 +144,9 @@ class TripEditorViewModel(private val c: AppContainer, val tripId: Long) : ViewM
         statusTouched = true
         status = s
     }
+
+    /** A name typed but not yet added as a chip; committed when the trip is saved. */
+    var travellerDraft = ""
 
     fun setTravellers(names: List<String>) {
         travellerNames = names
@@ -161,7 +191,10 @@ class TripEditorViewModel(private val c: AppContainer, val tripId: Long) : ViewM
     }
 
     fun save(onSaved: (id: Long, created: Boolean) -> Unit, onError: (String) -> Unit) {
-        if (saving || !validate()) return
+        if (saving) return
+        // A name still in the box counts: commit it first so validation and the count see it.
+        if (travellerNames.withDraft(travellerDraft) != travellerNames) setTravellers(travellerNames.withDraft(travellerDraft))
+        if (!validate()) { onError("Please fix the highlighted fields"); return }
         saving = true
         viewModelScope.launch {
             try {
@@ -188,9 +221,8 @@ class TripEditorViewModel(private val c: AppContainer, val tripId: Long) : ViewM
                 val id = c.trips.save(entity, travellerNames, newCover = pendingCover, removeCover = removeCover)
                 onSaved(id, isNew)
             } catch (e: Exception) {
-                onError(e.message ?: "Couldn't save the trip")
-            } finally {
                 saving = false
+                onError(e.message ?: "Couldn't save the trip")
             }
         }
     }

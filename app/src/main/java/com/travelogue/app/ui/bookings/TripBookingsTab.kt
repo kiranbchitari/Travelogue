@@ -69,13 +69,15 @@ fun TripBookingsTab(nav: Nav, tripId: Long, modifier: Modifier = Modifier) {
                         item {
                             ChoiceRow(
                                 options = listOf<BookingType?>(null) + types,
-                                selected = filter,
+                                selected = filter?.takeIf { it in types },
                                 label = { it?.label ?: "All · ${all.size}" },
                                 onSelect = { filter = it },
                             )
                         }
                     }
-                    val shown = all.filter { filter == null || it.booking.type == filter }
+                    // A filter whose chip has disappeared (its last booking was deleted) no longer applies.
+                    val active = filter?.takeIf { types.size > 1 && it in types }
+                    val shown = all.filter { active == null || it.booking.type == active }
                     items(shown, key = { it.booking.id }) { item ->
                         TicketCard(item, { nav.bookingEditor(tripId, item.booking.id) }, Modifier.padding(horizontal = Space.gutter))
                     }

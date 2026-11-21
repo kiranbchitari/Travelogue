@@ -85,15 +85,15 @@ fun UriImage(uri: Uri, modifier: Modifier = Modifier, contentScale: ContentScale
 }
 
 private val ArtPalettes = listOf(
-    listOf(Color(0xFFE9A27C), Color(0xFFC5603C), Color(0xFF6B3A2E)),
-    listOf(Color(0xFF9CC5C0), Color(0xFF2F5D62), Color(0xFF1C3439)),
-    listOf(Color(0xFFF1D08A), Color(0xFFC99A2E), Color(0xFF7A5A1E)),
-    listOf(Color(0xFFC9D3B0), Color(0xFF7D8F5E), Color(0xFF3F4A2E)),
-    listOf(Color(0xFFDDB7CF), Color(0xFF7A4E6B), Color(0xFF3B2434)),
-    listOf(Color(0xFFB7C6D6), Color(0xFF52687D), Color(0xFF26323E)),
+    listOf(Color(0xFFE8956B), Color(0xFFB8472A), Color(0xFF2A1310)),
+    listOf(Color(0xFF7FB8AE), Color(0xFF1F5A52), Color(0xFF0C2622)),
+    listOf(Color(0xFFE9C17A), Color(0xFFA9741F), Color(0xFF2B1D0A)),
+    listOf(Color(0xFFB4C3A0), Color(0xFF55704A), Color(0xFF18220F)),
+    listOf(Color(0xFFCFA3C4), Color(0xFF6A3A63), Color(0xFF201020)),
+    listOf(Color(0xFFA6B8D0), Color(0xFF3A4F73), Color(0xFF10182A)),
 )
 
-/** Deterministic, warm sunset illustration used where a photo is missing. */
+/** Deterministic dusk illustration used where a photo is missing. */
 @Composable
 fun GradientArt(seed: String, modifier: Modifier = Modifier) {
     val idx = abs(seed.hashCode()) % ArtPalettes.size
@@ -102,8 +102,8 @@ fun GradientArt(seed: String, modifier: Modifier = Modifier) {
     Canvas(modifier.background(Brush.verticalGradient(listOf(p[0], p[1])))) {
         val w = size.width
         val h = size.height
-        drawCircle(Color.White.copy(alpha = 0.85f), radius = minOf(w, h) * 0.16f, center = Offset(w * sunX, h * 0.52f))
-        drawCircle(Color.White.copy(alpha = 0.18f), radius = minOf(w, h) * 0.26f, center = Offset(w * sunX, h * 0.52f))
+        drawCircle(Color.White.copy(alpha = 0.9f), radius = minOf(w, h) * 0.13f, center = Offset(w * sunX, h * 0.52f))
+        drawCircle(Color.White.copy(alpha = 0.14f), radius = minOf(w, h) * 0.24f, center = Offset(w * sunX, h * 0.52f))
         // Layered hills
         val hill1 = androidx.compose.ui.graphics.Path().apply {
             moveTo(0f, h * 0.68f)
@@ -160,7 +160,8 @@ fun rememberDocumentPicker(onPicked: (List<Uri>) -> Unit): () -> Unit {
 @Composable
 fun rememberCameraCapture(onCaptured: (Uri) -> Unit): () -> Unit {
     val context = LocalContext.current
-    var pending by remember { mutableStateOf<Uri?>(null) }
+    // Saveable: the activity is often recreated (rotation) while the camera app is in front.
+    var pending by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf<Uri?>(null) }
     val launcher = rememberLauncherForActivityResult(ActivityResultContracts.TakePicture()) { ok ->
         val u = pending
         if (ok && u != null) onCaptured(u)
@@ -225,7 +226,7 @@ fun SinglePhotoField(
         val has = pending != null || !savedPath.isNullOrBlank()
         Box(
             Modifier.fillMaxWidth().height(height).clip(shape).background(Travel.colors.card)
-                .then(if (!has) Modifier.border(1.5.dp, Travel.colors.line, shape) else Modifier)
+                .then(if (!has) Modifier.border(1.dp, Travel.colors.line, shape) else Modifier)
                 .clickable(onClick = pick),
             contentAlignment = Alignment.Center,
         ) {
@@ -233,7 +234,7 @@ fun SinglePhotoField(
                 pending != null -> UriImage(pending, Modifier.fillMaxSize())
                 !savedPath.isNullOrBlank() -> PhotoImage(savedPath, Modifier.fillMaxSize())
                 else -> Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Icon(Icons.Rounded.AddPhotoAlternate, null, tint = Travel.colors.accent, modifier = Modifier.size(32.dp))
+                    Icon(Icons.Rounded.AddPhotoAlternate, null, tint = Travel.colors.inkSoft, modifier = Modifier.size(28.dp))
                     Spacer(Modifier.height(6.dp))
                     Text("Tap to choose a photo", style = Travel.type.body, color = Travel.colors.inkSoft)
                 }
@@ -249,11 +250,11 @@ fun SinglePhotoField(
 @Composable
 private fun AddTile(icon: androidx.compose.ui.graphics.vector.ImageVector, label: String, size: Dp, onClick: () -> Unit) {
     Column(
-        Modifier.size(size).clip(Shapes.md).background(Travel.colors.card).border(1.5.dp, Travel.colors.line, Shapes.md).clickable(onClick = onClick),
+        Modifier.size(size).clip(Shapes.md).background(Travel.colors.card).border(1.dp, Travel.colors.line, Shapes.md).clickable(onClick = onClick),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
     ) {
-        Icon(icon, null, tint = Travel.colors.accent, modifier = Modifier.size(26.dp))
+        Icon(icon, null, tint = Travel.colors.inkSoft, modifier = Modifier.size(24.dp))
         Spacer(Modifier.height(4.dp))
         Text(label, style = Travel.type.bodySmall, color = Travel.colors.inkSoft)
     }

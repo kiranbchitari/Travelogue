@@ -1,6 +1,7 @@
 package com.travelogue.app.ui.navigation
 
 import androidx.compose.runtime.Stable
+import androidx.lifecycle.Lifecycle
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.NavHostController
 
@@ -11,6 +12,9 @@ import androidx.navigation.NavHostController
 @Stable
 class Nav(val controller: NavHostController) {
     fun back() {
+        // While a screen is already animating out it is no longer RESUMED; a second tap on back or
+        // save in that window must not pop the screen underneath as well.
+        if (controller.currentBackStackEntry?.lifecycle?.currentState != Lifecycle.State.RESUMED) return
         if (controller.previousBackStackEntry != null) controller.popBackStack()
     }
 

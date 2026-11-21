@@ -1,5 +1,11 @@
 package com.travelogue.app.ui.diary
 
+import com.travelogue.app.ui.common.read
+import com.travelogue.app.ui.common.DraftSlot
+import com.travelogue.app.ui.common.DraftHolder
+import androidx.core.os.bundleOf
+import android.os.Bundle
+import com.travelogue.app.core.designsystem.components.withDraft
 import android.net.Uri
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
@@ -72,7 +78,7 @@ class DiaryEditorViewModel(
     private val photos: PhotoRepository,
     val tripId: Long,
     val entryId: Long,
-) : ViewModel() {
+) : ViewModel(), DraftHolder {
     val isNew = entryId == 0L
 
     var loading by mutableStateOf(true); private set
@@ -108,6 +114,22 @@ class DiaryEditorViewModel(
         .map { rows -> rows.groupingBy { it.name }.eachCount().entries.sortedByDescending { it.value }.map { it.key } }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
+    private val draft = DraftSlot(::applyDraft)
+    override fun restoreDraft(draft: Bundle) = this.draft.offer(draft)
+    override fun saveDraft(): Bundle = if (!draft.ready || finished) Bundle() else bundleOf(
+        "title" to title, "body" to body, "date" to date, "time" to time, "location" to location, "mood" to mood,
+        "tags" to ArrayList(tags), "removedSaved" to ArrayList(removedSaved), "captions" to HashMap(savedCaptionEdits), "dirty" to dirty,
+    )
+
+    private fun applyDraft(b: Bundle) {
+        title = b.read("title") ?: title; body = b.read("body") ?: body; date = b.read("date"); time = b.read("time")
+        location = b.read("location") ?: location; mood = b.read("mood")
+        tags = b.read<ArrayList<String>>("tags") ?: tags
+        b.read<ArrayList<Long>>("removedSaved")?.let { ids -> removedSaved.clear(); removedSaved.addAll(ids) }
+        b.read<HashMap<Long, String>>("captions")?.let { savedCaptionEdits.putAll(it) }
+        dirty = b.getBoolean("dirty", dirty)
+    }
+
     init {
         viewModelScope.launch {
             val t = trips.get(tripId)
@@ -132,6 +154,7 @@ class DiaryEditorViewModel(
                 time = LocalTime.now().withSecond(0).withNano(0)
             }
             loading = false
+            draft.ready()
         }
     }
 
@@ -142,6 +165,10 @@ class DiaryEditorViewModel(
     fun updateLocation(v: String) { location = v; dirty = true }
     fun updateMood(v: Mood?) { mood = v; dirty = true }
     fun updateTags(v: List<String>) { tags = v; dirty = true }
+
+    /** Tag text typed but not yet added as a chip; included on save. */
+    private var tagDraft = ""
+    fun updateTagDraft(v: String) { tagDraft = v; if (v.isNotEmpty()) dirty = true }
 
     fun addPhotos(uris: List<Uri>) {
         uris.filterNot { it in pending }.forEach { pending += it }
@@ -173,17 +200,17 @@ class DiaryEditorViewModel(
                     location = location.trim(),
                     mood = mood,
                 )
-                diary.save(entry, tags, pending.toList(), pendingCaptions.filterValues { it.isNotBlank() }.mapValues { it.value.trim() })
+                diary.save(entry, tags.withDraft(tagDraft), pending.toList(), pendingCaptions.filterValues { it.isNotBlank() }.mapValues { it.value.trim() })
                 removedSaved.forEach { photos.delete(it) }
                 savedCaptionEdits.filterKeys { it !in removedSaved }.forEach { (id, c) -> photos.setCaption(id, c) }
                 dirty = false
                 finished = true
             } catch (e: StorageFullException) {
+                saving = false
                 message = e.message
             } catch (e: Exception) {
-                message = "Couldn't save the entry: ${e.message ?: "unknown error"}"
-            } finally {
                 saving = false
+                message = "Couldn't save the entry: ${e.message ?: "unknown error"}"
             }
         }
     }

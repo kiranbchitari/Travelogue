@@ -29,7 +29,9 @@ class JournalRepository(
 
     suspend fun saveHotel(hotel: HotelEntity, newPhotos: List<Uri> = emptyList()): Long {
         val id = if (hotel.id == 0L) hotels.insert(hotel) else { hotels.update(hotel); hotel.id }
-        if (newPhotos.isNotEmpty()) photos.addPhotos(hotel.tripId, newPhotos, PhotoOwner.HOTEL, id, hotel.checkIn.atTime(14, 0))
+        undoNewRowOnFailure(isNew = hotel.id == 0L, undo = { deleteHotel(id) }) {
+            if (newPhotos.isNotEmpty()) photos.addPhotos(hotel.tripId, newPhotos, PhotoOwner.HOTEL, id, hotel.checkIn.atTime(14, 0))
+        }
         return id
     }
 
@@ -118,9 +120,11 @@ class JournalRepository(
 
     suspend fun savePlace(place: PlaceEntity, newPhotos: List<Uri> = emptyList()): Long {
         val id = if (place.id == 0L) places.insert(place) else { places.update(place); place.id }
-        if (newPhotos.isNotEmpty()) {
-            val at = (place.visitDate ?: java.time.LocalDate.now()).atTime(12, 0)
-            photos.addPhotos(place.tripId, newPhotos, PhotoOwner.PLACE, id, at)
+        undoNewRowOnFailure(isNew = place.id == 0L, undo = { deletePlace(id) }) {
+            if (newPhotos.isNotEmpty()) {
+                val at = (place.visitDate ?: java.time.LocalDate.now()).atTime(12, 0)
+                photos.addPhotos(place.tripId, newPhotos, PhotoOwner.PLACE, id, at)
+            }
         }
         return id
     }
@@ -136,7 +140,9 @@ class JournalRepository(
 
     suspend fun saveBooking(booking: BookingEntity, newAttachments: List<Uri> = emptyList()): Long {
         val id = if (booking.id == 0L) bookings.insert(booking) else { bookings.update(booking); booking.id }
-        newAttachments.forEach { trips.addDocument(booking.tripId, DocumentOwner.BOOKING, id, it) }
+        undoNewRowOnFailure(isNew = booking.id == 0L, undo = { deleteBooking(id) }) {
+            newAttachments.forEach { trips.addDocument(booking.tripId, DocumentOwner.BOOKING, id, it) }
+        }
         return id
     }
 
@@ -151,4 +157,21 @@ class JournalRepository(
     suspend fun saveContact(c: TravelContactEntity): Long = if (c.id == 0L) contacts.insert(c) else { contacts.update(c); c.id }
     suspend fun deleteContact(id: Long) = contacts.delete(id)
 
+}
+
+/**
+ * Runs the media step of a save. The row is written first (photos and documents need its id), so if
+ * copying a file then fails (file too large, storage full) a row that was only just created is
+ * removed again. Otherwise the editor, which still thinks the record is new, would insert a second
+ * copy when the user fixes the problem and taps Save again.
+ */
+internal suspend fun undoNewRowOnFailure(isNew: Boolean, undo: suspend () -> Unit, block: suspend () -> Unit) {
+    try {
+        block()
+    } catch (e: Exception) {
+        if (isNew && e !is kotlinx.coroutines.CancellationException) {
+            kotlinx.coroutines.withContext(kotlinx.coroutines.NonCancellable) { runCatching { undo() } }
+        }
+        throw e
+    }
 }

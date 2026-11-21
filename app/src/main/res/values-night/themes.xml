@@ -1,11 +1,11 @@
 <resources>
     <style name="Theme.Travelogue" parent="android:Theme.Material.NoActionBar">
-        <item name="android:windowBackground">#141211</item>
+        <item name="android:windowBackground">#060606</item>
         <item name="android:statusBarColor">@android:color/transparent</item>
         <item name="android:navigationBarColor">@android:color/transparent</item>
     </style>
     <style name="Theme.Travelogue.Splash" parent="Theme.SplashScreen">
-        <item name="windowSplashScreenBackground">#141211</item>
+        <item name="windowSplashScreenBackground">#060606</item>
         <item name="windowSplashScreenAnimatedIcon">@drawable/ic_splash</item>
         <item name="postSplashScreenTheme">@style/Theme.Travelogue</item>
     </style>

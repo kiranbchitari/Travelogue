@@ -62,7 +62,14 @@ class MediaStorage(private val context: Context) {
         val size = estimateSize(uri)
         if (size > MAX_DOCUMENT_BYTES) throw IOException("File is larger than 50 MB")
         ensureSpace(size)
-        val ext = name.substringAfterLast('.', "").ifBlank { MimeTypeMap.getSingleton().getExtensionFromMimeType(mime) ?: "bin" }
+        // Display names are free text ("E-Ticket 21.11", "Invoice No. 4521"), so whatever follows the
+        // last dot is only trusted when it is a real, known extension. Otherwise fall back to the MIME
+        // type. A bad extension here would make the trip's own export impossible to import again.
+        val mimes = MimeTypeMap.getSingleton()
+        val safe = Regex("[a-z0-9]{1,8}")
+        val ext = name.substringAfterLast('.', "").lowercase().takeIf { it.matches(safe) && mimes.hasExtension(it) }
+            ?: mimes.getExtensionFromMimeType(mime)?.lowercase()?.takeIf { it.matches(safe) }
+            ?: "bin"
         val dir = File(tripDir(tripUuid), folder).apply { mkdirs() }
         val target = File(dir, "${UUID.randomUUID()}.$ext")
         copyRaw(uri, target)

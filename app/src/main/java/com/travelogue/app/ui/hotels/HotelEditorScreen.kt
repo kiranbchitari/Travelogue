@@ -110,7 +110,7 @@ fun HotelEditorScreen(nav: Nav, tripId: Long, hotelId: Long) {
             }
 
             FormSection("Amenities") {
-                ChipInput("Add amenity", vm.amenities, { vm.amenities = it }, placeholder = "e.g. Rooftop bar", suggestions = AmenitySuggestions)
+                ChipInput("Add amenity", vm.amenities, { vm.amenities = it }, placeholder = "e.g. Rooftop bar", suggestions = AmenitySuggestions, onDraftChange = { vm.amenityDraft = it })
             }
 
             FormSection("Photos") {

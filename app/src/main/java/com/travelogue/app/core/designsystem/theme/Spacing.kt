@@ -16,15 +16,16 @@ object Space {
     val huge = 48.dp
     /** Horizontal page gutter. */
     val gutter = 20.dp
-    /** Bottom padding so content clears the floating bottom bar. */
-    val bottomBarClearance = 112.dp
+    /** Bottom padding so content clears the docked bottom bar. */
+    val bottomBarClearance = 96.dp
 }
 
+/** Tight, crisp corners: cards and buttons read as cut paper rather than soft blobs. */
 object Shapes {
-    val xs = RoundedCornerShape(8.dp)
-    val sm = RoundedCornerShape(12.dp)
-    val md = RoundedCornerShape(18.dp)
-    val lg = RoundedCornerShape(24.dp)
-    val xl = RoundedCornerShape(32.dp)
+    val xs = RoundedCornerShape(4.dp)
+    val sm = RoundedCornerShape(8.dp)
+    val md = RoundedCornerShape(10.dp)
+    val lg = RoundedCornerShape(14.dp)
+    val xl = RoundedCornerShape(22.dp)
     val pill = RoundedCornerShape(50)
 }

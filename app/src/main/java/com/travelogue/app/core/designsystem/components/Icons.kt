@@ -98,7 +98,7 @@ val PaymentMethod.icon: ImageVector
 fun TripStatus.color(): Color = when (this) {
     TripStatus.PLANNING -> Travel.colors.inkSoft
     TripStatus.UPCOMING -> Travel.colors.secondary
-    TripStatus.ONGOING -> Travel.colors.accent
+    TripStatus.ONGOING -> Travel.colors.gold
     TripStatus.COMPLETED -> Travel.colors.sage
 }
 
@@ -106,8 +106,8 @@ fun TripStatus.color(): Color = when (this) {
 @ReadOnlyComposable
 fun PaymentStatus.color(): Color = when (this) {
     PaymentStatus.PAID -> Travel.colors.success
-    PaymentStatus.PARTIALLY_PAID -> Travel.colors.gold
-    PaymentStatus.PENDING, PaymentStatus.PAY_AT_PROPERTY -> Travel.colors.accent
+    PaymentStatus.PARTIALLY_PAID -> Travel.colors.secondary
+    PaymentStatus.PENDING, PaymentStatus.PAY_AT_PROPERTY -> Travel.colors.gold
     PaymentStatus.REFUNDED -> Travel.colors.inkSoft
 }
 
