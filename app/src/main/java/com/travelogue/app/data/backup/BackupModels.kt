@@ -73,6 +73,8 @@ data class SettingsArchive(
     val themeMode: String = "SYSTEM",
     val travellers: List<TravellerEntity> = emptyList(),
     val categories: List<ExpenseCategoryEntity> = emptyList(),
+    /** "EUR>INR=92.5" entries (Settings → Exchange rates). */
+    val exchangeRates: List<String> = emptyList(),
 )
 
 val BackupJson = Json {

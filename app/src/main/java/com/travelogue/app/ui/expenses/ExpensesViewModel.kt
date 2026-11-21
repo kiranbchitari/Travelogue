@@ -5,6 +5,8 @@ import androidx.lifecycle.viewModelScope
 import com.travelogue.app.data.db.entity.*
 import com.travelogue.app.di.AppContainer
 import com.travelogue.app.domain.CurrencyConverter
+import com.travelogue.app.domain.ExchangeRate
+import com.travelogue.app.domain.HomeConverter
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.*
 import java.time.LocalDate
@@ -23,8 +25,11 @@ data class GlobalFilters(
     val customEnd: LocalDate? = null,
 )
 
-/** An expense with its trip and its value in the trip's currency (null if no manual rate). */
-data class GlobalExpense(val expense: ExpenseEntity, val trip: TripEntity, val converted: Double?)
+/**
+ * An expense with its trip, its value in the trip's currency and its value in the default currency
+ * (each null when no manual rate chain exists).
+ */
+data class GlobalExpense(val expense: ExpenseEntity, val trip: TripEntity, val converted: Double?, val inHome: Double?)
 
 data class CurrencyTotal(val currency: String, val total: Double)
 data class CategoryAmount(val category: ExpenseCategoryEntity?, val total: Double)
@@ -39,14 +44,18 @@ data class ExpensesUi(
     val anyExpenses: Boolean = false,
     val filtered: List<GlobalExpense> = emptyList(),
     val totals: List<CurrencyTotal> = emptyList(),
+    /** The default currency; every total and chart on this screen is in it. */
     val primaryCurrency: String = "INR",
+    val homeTotal: Double = 0.0,
     val unconvertedCount: Int = 0,
+    /** Original-currency amounts that have no rate into the default currency. */
+    val unconverted: List<CurrencyTotal> = emptyList(),
     val byCategory: List<CategoryAmount> = emptyList(),
     val periods: List<PeriodAmount> = emptyList(),
     val periodsAreDays: Boolean = false,
     val filters: GlobalFilters = GlobalFilters(),
 ) {
-    val primaryTotal: Double get() = totals.firstOrNull { it.currency == primaryCurrency }?.total ?: 0.0
+    val primaryTotal: Double get() = homeTotal
     val categoryById: Map<Long, ExpenseCategoryEntity> get() = categories.associateBy { it.id }
 }
 
@@ -62,6 +71,7 @@ private data class Extra(
     val rates: List<CurrencyRateEntity>,
     val splits: List<ExpenseSplitEntity>,
     val defaultCurrency: String,
+    val exchangeRates: List<ExchangeRate>,
 )
 
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -77,7 +87,7 @@ class ExpensesViewModel(c: AppContainer) : ViewModel() {
         Base(t, e, cat, tr)
     }
     private val extra = combine(c.trips.observeAllTripTravellers(), c.trips.observeAllRates(), allSplits, c.settings.settings) { tt, r, s, st ->
-        Extra(tt, r, s, st.defaultCurrency)
+        Extra(tt, r, s, st.defaultCurrency, st.exchangeRates)
     }
 
     val state: StateFlow<ExpensesUi> = combine(base, extra, filters) { b, x, f -> build(b, x, f) }
@@ -92,6 +102,7 @@ class ExpensesViewModel(c: AppContainer) : ViewModel() {
             t.id to CurrencyConverter(t.currency, ratesByTrip[t.id].orEmpty().associate { it.currency to it.rate })
         }
         val splitsByExpense = x.splits.groupBy { it.expenseId }
+        val home = HomeConverter(x.defaultCurrency.uppercase(), x.exchangeRates)
 
         val today = LocalDate.now()
         val (from, to) = when (f.range) {
@@ -113,23 +124,25 @@ class ExpensesViewModel(c: AppContainer) : ViewModel() {
                     (e.splitType != SplitType.NONE && splitsByExpense[e.id].orEmpty().any { it.travellerId == f.travellerId })
                 if (!involved) return@mapNotNull null
             }
-            GlobalExpense(e, trip, converters[trip.id]?.toBase(e.amount, e.currency))
+            val conv = converters[trip.id]
+            GlobalExpense(e, trip, conv?.toBase(e.amount, e.currency), home.convert(e.amount, e.currency, conv))
         }
 
         val totals = filtered.filter { it.converted != null }
             .groupBy { it.trip.currency.uppercase() }
             .map { (cur, rows) -> CurrencyTotal(cur, rows.sumOf { it.converted ?: 0.0 }) }
-        val primary = when {
-            totals.any { it.currency.equals(x.defaultCurrency, true) } -> x.defaultCurrency.uppercase()
-            totals.isNotEmpty() -> totals.maxBy { it.total }.currency
-            else -> x.defaultCurrency.uppercase()
-        }
-        val sortedTotals = totals.sortedWith(compareByDescending<CurrencyTotal> { it.currency == primary }.thenByDescending { it.total })
+        val primary = home.home
+        val sortedTotals = totals.sortedByDescending { it.total }
 
-        val inPrimary = filtered.filter { it.converted != null && it.trip.currency.equals(primary, true) }
+        // Every trip, brought into the default currency.
+        val inPrimary = filtered.filter { it.inHome != null }
+        val unconverted = filtered.filter { it.inHome == null }
+            .groupBy { it.expense.currency.uppercase() }
+            .map { (cur, rows) -> CurrencyTotal(cur, rows.sumOf { it.expense.amount }) }
+            .sortedByDescending { it.total }
         val catById = b.categories.associateBy { it.id }
         val byCategory = inPrimary.groupBy { it.expense.categoryId }
-            .map { (cid, rows) -> CategoryAmount(cid?.let(catById::get), rows.sumOf { it.converted ?: 0.0 }) }
+            .map { (cid, rows) -> CategoryAmount(cid?.let(catById::get), rows.sumOf { it.inHome ?: 0.0 }) }
             .filter { it.total > 0 }
             .sortedByDescending { it.total }
 
@@ -141,13 +154,13 @@ class ExpensesViewModel(c: AppContainer) : ViewModel() {
             periods = emptyList()
         } else if (singleMonth) {
             val ym = if (f.range == DateRange.THIS_MONTH) YearMonth.from(today) else months.first()
-            val byDay = inPrimary.groupBy { it.expense.date.dayOfMonth }.mapValues { (_, r) -> r.sumOf { it.converted ?: 0.0 } }
+            val byDay = inPrimary.groupBy { it.expense.date.dayOfMonth }.mapValues { (_, r) -> r.sumOf { it.inHome ?: 0.0 } }
             periods = (1..ym.lengthOfMonth()).map { d -> PeriodAmount(d.toString(), byDay[d] ?: 0.0) }
         } else {
             val first = months.first()
             val last = months.last()
             val all = generateSequence(first) { it.plusMonths(1) }.takeWhile { !it.isAfter(last) }.toList().takeLast(12)
-            val byMonth = inPrimary.groupBy { YearMonth.from(it.expense.date) }.mapValues { (_, r) -> r.sumOf { it.converted ?: 0.0 } }
+            val byMonth = inPrimary.groupBy { YearMonth.from(it.expense.date) }.mapValues { (_, r) -> r.sumOf { it.inHome ?: 0.0 } }
             periods = all.map { ym ->
                 val label = ym.month.getDisplayName(java.time.format.TextStyle.SHORT, java.util.Locale.getDefault()) +
                     if (all.first().year != all.last().year && ym.monthValue == 1) " ’${ym.year % 100}" else ""
@@ -170,7 +183,9 @@ class ExpensesViewModel(c: AppContainer) : ViewModel() {
             filtered = filtered.sortedWith(compareByDescending<GlobalExpense> { it.expense.date }.thenByDescending { it.expense.time }.thenByDescending { it.expense.id }),
             totals = sortedTotals,
             primaryCurrency = primary,
-            unconvertedCount = filtered.count { it.converted == null },
+            homeTotal = inPrimary.sumOf { it.inHome ?: 0.0 },
+            unconvertedCount = filtered.count { it.inHome == null },
+            unconverted = unconverted,
             byCategory = byCategory,
             periods = periods,
             periodsAreDays = singleMonth,

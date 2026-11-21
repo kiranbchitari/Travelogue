@@ -77,7 +77,7 @@ fun SettingsScreen(nav: Nav) {
             SettingsGroup("Preferences") {
                 DropdownField(
                     label = "Default currency",
-                    options = (listOf(settings.defaultCurrency) + CommonCurrencies).distinct(),
+                    options = if (settings.defaultCurrency in CommonCurrencies) CommonCurrencies else listOf(settings.defaultCurrency) + CommonCurrencies,
                     selected = settings.defaultCurrency,
                     optionLabel = { "$it  ·  ${Fmt.currencySymbol(it)}" },
                     onSelect = vm::setCurrency,
@@ -85,6 +85,7 @@ fun SettingsScreen(nav: Nav) {
                 Spacer(Modifier.height(Space.sm))
                 NavRow(Icons.Rounded.Group, "Travellers", "People you travel with", nav::travellers)
                 NavRow(Icons.Rounded.Category, "Expense categories", "Default and custom categories", nav::categories)
+                NavRow(Icons.Rounded.CurrencyExchange, "Exchange rates", "Bring every trip into ${settings.defaultCurrency}", nav::exchangeRates)
             }
         }
 

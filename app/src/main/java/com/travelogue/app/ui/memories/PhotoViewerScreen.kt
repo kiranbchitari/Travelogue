@@ -197,7 +197,10 @@ fun PhotoViewerScreen(nav: Nav, tripId: Long, photoId: Long, favouritesOnly: Boo
     }
 }
 
-/** Pinch / double-tap zoom with pan. At 1× it lets horizontal drags through so the pager can swipe. */
+/**
+ * Pinch / double-tap zoom with pan. At 1× horizontal drags go to the pager; when zoomed, dragging
+ * past the photo's edge swipes to the neighbouring photo (which opens at 1×).
+ */
 @Composable
 private fun ZoomableImage(relativePath: String, isCurrent: Boolean, onTap: () -> Unit) {
     var scale by remember { mutableFloatStateOf(1f) }
@@ -230,18 +233,49 @@ private fun ZoomableImage(relativePath: String, isCurrent: Boolean, onTap: () ->
                 )
             }
             .pointerInput(Unit) {
+                val slop = viewConfiguration.touchSlop
                 awaitEachGesture {
                     awaitFirstDown(requireUnconsumed = false)
+                    // For a one-finger drag on a zoomed photo we decide, once the drag passes touch
+                    // slop, whether it pans the photo or swipes to the next one. It swipes when the
+                    // photo is already panned to that edge and the drag is mostly horizontal and
+                    // outward. Until then nothing is consumed, so the pager can still take over.
+                    var decided = false
+                    var passToPager = false
+                    var pending = Offset.Zero
                     do {
                         val event = awaitPointerEvent()
                         val zoom = event.calculateZoom()
                         val pan = event.calculatePan()
                         val fingers = event.changes.count { it.pressed }
-                        if (fingers > 1 || scale > 1.01f) {
-                            val newScale = (scale * zoom).coerceIn(1f, 5f)
-                            scale = newScale
-                            offset = if (newScale <= 1.01f) Offset.Zero else clamp(offset + pan, newScale)
-                            event.changes.forEach { if (it.positionChanged()) it.consume() }
+                        when {
+                            fingers > 1 -> {
+                                decided = true; passToPager = false
+                                val newScale = (scale * zoom).coerceIn(1f, 5f)
+                                scale = newScale
+                                offset = if (newScale <= 1.01f) Offset.Zero else clamp(offset + pan, newScale)
+                                event.changes.forEach { if (it.positionChanged()) it.consume() }
+                            }
+                            scale > 1.01f && !passToPager -> {
+                                if (!decided) {
+                                    pending += pan
+                                    if (pending.getDistance() > slop) {
+                                        decided = true
+                                        val maxX = size.width * (scale - 1) / 2f
+                                        val horizontal = kotlin.math.abs(pending.x) > kotlin.math.abs(pending.y) * 1.2f
+                                        val atRight = offset.x <= -maxX + 1f // showing the photo's right edge
+                                        val atLeft = offset.x >= maxX - 1f   // showing the photo's left edge
+                                        passToPager = horizontal && ((pending.x < 0 && atRight) || (pending.x > 0 && atLeft))
+                                        if (!passToPager) {
+                                            offset = clamp(offset + pending, scale)
+                                            event.changes.forEach { if (it.positionChanged()) it.consume() }
+                                        }
+                                    }
+                                } else {
+                                    offset = clamp(offset + pan, scale)
+                                    event.changes.forEach { if (it.positionChanged()) it.consume() }
+                                }
+                            }
                         }
                     } while (event.changes.any { it.pressed })
                 }

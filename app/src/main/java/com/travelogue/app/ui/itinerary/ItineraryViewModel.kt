@@ -65,6 +65,9 @@ class ItineraryViewModel(
 
     fun nudge(id: Long, delta: Int) = launch { journal.nudgeActivity(id, delta) }
 
+    /** Persists a drag-and-drop order for one day. */
+    fun reorder(dayId: Long, orderedIds: List<Long>) = launch { journal.reorderActivities(dayId, orderedIds) }
+
     fun move(id: Long, toDayId: Long, dayLabel: String) = launch {
         journal.moveActivity(id, toDayId)
         messages.send("Moved to $dayLabel")

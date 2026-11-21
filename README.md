@@ -78,7 +78,8 @@ Before anything is written, an import:
 ## Testing done
 
 - Unit tests (`FinanceTest`): equal-split rounding, manual conversion, balances, settlement suggestions,
-  trip analytics totals and groupings.
+  trip analytics totals and groupings, conversion into the default currency, and how exchange rates
+  are stored.
 - Instrumented tests (`BackupRoundTripTest`, run on an API 37 emulator):
   - exports a demo trip, confirms the documented ZIP layout, and re-imports it as a copy, checking that
     every record count, split, settlement, tag and photo file matches;
@@ -89,11 +90,15 @@ Before anything is written, an import:
   settlement, trip story, photo viewer, settings, trip creation with validation, light and dark themes,
   the minified release build, and exporting a trip through the system file picker.
 
-## Known limitations
+## Notes
 
-- Activities are reordered with up/down actions rather than drag and drop.
-- In the photo viewer, a zoomed-in photo has to be zoomed back out before you can swipe to the next one.
-- Global charts on the Expenses tab only include trips in your default currency. Each trip's own
-  screens convert everything to that trip's currency.
-- No in-app camera screen. The camera buttons open the installed camera app, so the app needs no
-  camera permission.
+- **Reordering activities:** press and hold an activity in a day's timeline, then drag it. The list
+  scrolls by itself near the edges. Up/down actions are still in the activity's ⋯ menu.
+- **Photo viewer:** pinch or double-tap to zoom. Once a zoomed photo is panned to its edge, the next
+  drag in that direction moves to the neighbouring photo, which opens at normal size.
+- **Cross-trip totals:** Home and the Expenses tab show every trip in your default currency. Each
+  trip's own rates are applied first. *Settings → Exchange rates* fills any gaps with rates you type
+  in, and suggests one when a trip already has it. Amounts that still have no rate are listed
+  separately, never guessed.
+- **Camera:** there's no in-app camera screen. The camera buttons open the installed camera app, so
+  the app needs no camera permission.

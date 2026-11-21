@@ -113,7 +113,7 @@ fun HomeScreen(nav: Nav) {
         item {
             SectionHeader(
                 "Monthly spending",
-                subtitle = "Last 12 months · ${s.defaultCurrency} trips",
+                subtitle = "Last 12 months · all trips in ${s.defaultCurrency}",
                 modifier = Modifier.padding(horizontal = Space.gutter).padding(top = Space.xxxl, bottom = Space.md),
             )
             SurfaceCard(Modifier.padding(horizontal = Space.gutter).fillMaxWidth()) {
@@ -202,7 +202,7 @@ private fun StatsGrid(s: HomeState) {
                 icon = Icons.Rounded.Payments,
                 tint = Travel.colors.secondary,
                 caption = s.otherTotals.entries.takeIf { it.isNotEmpty() }
-                    ?.joinToString(" · ") { "+" + Fmt.money(it.value, it.key, compact = true) },
+                    ?.joinToString(" · ", postfix = " without a rate") { "+" + Fmt.money(it.value, it.key, compact = true) },
             )
         }
         Row(horizontalArrangement = Arrangement.spacedBy(Space.md)) {

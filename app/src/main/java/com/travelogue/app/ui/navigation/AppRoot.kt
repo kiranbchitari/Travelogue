@@ -55,6 +55,7 @@ import com.travelogue.app.ui.memories.TripGalleryScreen
 import com.travelogue.app.ui.memories.TripTimelineScreen
 import com.travelogue.app.ui.places.PlaceDetailScreen
 import com.travelogue.app.ui.places.PlaceEditorScreen
+import com.travelogue.app.ui.settings.ExchangeRatesScreen
 import com.travelogue.app.ui.settings.ManageCategoriesScreen
 import com.travelogue.app.ui.settings.ManageTravellersScreen
 import com.travelogue.app.ui.settings.SettingsScreen
@@ -119,6 +120,7 @@ fun AppRoot() {
 
             composable<ManageCategoriesRoute> { ManageCategoriesScreen(nav) }
             composable<ManageTravellersRoute> { ManageTravellersScreen(nav) }
+            composable<ExchangeRatesRoute> { ExchangeRatesScreen(nav) }
         }
 
         // Tab screens scroll edge-to-edge; keep the status bar legible over their content.

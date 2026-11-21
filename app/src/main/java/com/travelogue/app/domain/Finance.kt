@@ -31,6 +31,43 @@ class CurrencyConverter(val baseCurrency: String, rates: Map<String, Double>) {
     }
 
     fun hasRate(currency: String) = currency.equals(baseCurrency, true) || rates.containsKey(currency.uppercase())
+
+    /** 1 unit of [currency] in the base currency, or null when no manual rate exists. */
+    fun rateFor(currency: String): Double? = if (currency.equals(baseCurrency, true)) 1.0 else rates[currency.uppercase()]
+}
+
+/** A manual exchange rate entered in Settings: 1 [from] = [rate] [to]. */
+data class ExchangeRate(val from: String, val to: String, val rate: Double)
+
+/**
+ * Converts any expense into the user's default ("home") currency for cross-trip totals and charts.
+ *
+ * Order of preference, so global numbers agree with each trip's own screens:
+ * 1. already in the home currency;
+ * 2. the trip's own rates into the trip currency, then trip currency → home (a Settings rate, or the
+ *    trip's own rate for the home currency, inverted);
+ * 3. a Settings rate straight from the expense currency to home.
+ * Returns null when no chain of manual rates exists. Nothing is ever looked up online.
+ */
+class HomeConverter(val home: String, rates: List<ExchangeRate>) {
+    private val toHome: Map<String, Double> = buildMap {
+        rates.filter { it.rate > 0 && it.to.equals(home, true) }.forEach { put(it.from.uppercase(), it.rate) }
+        rates.filter { it.rate > 0 && it.from.equals(home, true) }.forEach { if (!containsKey(it.to.uppercase())) put(it.to.uppercase(), 1 / it.rate) }
+    }
+
+    fun rate(currency: String): Double? = if (currency.equals(home, true)) 1.0 else toHome[currency.uppercase()]
+
+    fun convert(amount: Double, currency: String, trip: CurrencyConverter? = null): Double? {
+        if (currency.equals(home, true)) return amount
+        if (trip != null) {
+            val inTrip = trip.toBase(amount, currency)
+            if (inTrip != null) {
+                rate(trip.baseCurrency)?.let { return inTrip * it }
+                trip.rateFor(home)?.let { r -> if (r > 0) return inTrip / r }
+            }
+        }
+        return rate(currency)?.let { amount * it }
+    }
 }
 
 // ---------------------------------------------------------------------------------------------

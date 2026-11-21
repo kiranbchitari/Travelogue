@@ -61,7 +61,7 @@ fun ExpensesScreen(nav: Nav) {
             }
             else -> {
                 item(key = "filters") { Filters(ui, vm) }
-                item(key = "totals") { TotalsCard(ui) }
+                item(key = "totals") { TotalsCard(ui, nav::exchangeRates) }
 
                 if (ui.filtered.isEmpty()) {
                     item(key = "none") {
@@ -82,7 +82,7 @@ fun ExpensesScreen(nav: Nav) {
                         item(key = "m-$ym") { MonthHeader(ym, monthRows, ui.primaryCurrency) }
                         monthRows.groupBy { it.expense.date }.forEach { (date, rows) ->
                             item(key = "d-$date") {
-                                val dayTotal = rows.filter { it.trip.currency.equals(ui.primaryCurrency, true) }.sumOf { it.converted ?: 0.0 }
+                                val dayTotal = rows.sumOf { it.inHome ?: 0.0 }
                                 DayHeader(date, if (dayTotal > 0) Fmt.money(dayTotal, ui.primaryCurrency) else null)
                             }
                             items(rows, key = { "e-${it.expense.id}" }) { g ->
@@ -92,9 +92,9 @@ fun ExpensesScreen(nav: Nav) {
                                     category = e.categoryId?.let { ui.categoryById[it] },
                                     meta = expenseMeta(e, e.paidByTravellerId?.let { ui.travellerNames[it] }),
                                     convertedLabel = when {
-                                        e.currency.equals(g.trip.currency, true) -> null
-                                        g.converted == null -> "No rate set"
-                                        else -> "≈ " + Fmt.money(g.converted, g.trip.currency)
+                                        e.currency.equals(ui.primaryCurrency, true) -> null
+                                        g.inHome == null -> "No rate set"
+                                        else -> "≈ " + Fmt.money(g.inHome, ui.primaryCurrency)
                                     },
                                     overline = g.trip.name,
                                     onClick = { nav.expenseEditor(e.tripId, e.id) },
@@ -170,7 +170,7 @@ private fun Filters(ui: ExpensesUi, vm: ExpensesViewModel) {
 }
 
 @Composable
-private fun TotalsCard(ui: ExpensesUi) {
+private fun TotalsCard(ui: ExpensesUi, onSetRates: () -> Unit) {
     SurfaceCard(
         Modifier.padding(horizontal = Space.gutter).padding(top = Space.md).fillMaxWidth(),
         contentPadding = SummaryPadding,
@@ -185,26 +185,25 @@ private fun TotalsCard(ui: ExpensesUi) {
                 color = Travel.colors.inkFaint,
             )
         }
-        val others = ui.totals.filter { it.currency != ui.primaryCurrency }
-        if (others.isNotEmpty()) {
+        Text("Every trip, in ${ui.primaryCurrency}", style = Travel.type.bodySmall, color = Travel.colors.inkFaint)
+        if (ui.unconverted.isNotEmpty()) {
             Spacer(Modifier.height(Space.md))
             Hairline()
             Spacer(Modifier.height(Space.sm))
-            Text("Trips in other currencies", style = Travel.type.bodySmall, color = Travel.colors.inkFaint)
-            others.forEach {
+            Text(
+                "Not included yet — no exchange rate into ${ui.primaryCurrency}:",
+                style = Travel.type.bodySmall,
+                color = Travel.colors.gold,
+            )
+            ui.unconverted.forEach {
                 Row(Modifier.fillMaxWidth().padding(top = 4.dp)) {
                     Text(it.currency, style = Travel.type.body, color = Travel.colors.inkSoft, modifier = Modifier.weight(1f))
                     Text(Fmt.money(it.total, it.currency), style = Travel.type.label, color = Travel.colors.ink)
                 }
             }
-        }
-        if (ui.unconvertedCount > 0) {
-            Spacer(Modifier.height(Space.sm))
-            Text(
-                "${ui.unconvertedCount} foreign-currency ${if (ui.unconvertedCount == 1) "expense isn't" else "expenses aren't"} included — set a manual rate in that trip's financial summary.",
-                style = Travel.type.bodySmall,
-                color = Travel.colors.gold,
-            )
+            TextButton(onClick = onSetRates, contentPadding = PaddingValues(0.dp)) {
+                Text("Set exchange rates →", style = Travel.type.label, color = Travel.colors.accent)
+            }
         }
     }
 }
@@ -221,7 +220,7 @@ private fun CategoryChartCard(ui: ExpensesUi) {
     ) {
         Overline("Where it went")
         if (ui.totals.size > 1) {
-            Text("Showing ${ui.primaryCurrency} trips", style = Travel.type.bodySmall, color = Travel.colors.inkFaint)
+            Text("All trips, converted to ${ui.primaryCurrency}", style = Travel.type.bodySmall, color = Travel.colors.inkFaint)
         }
         Spacer(Modifier.height(Space.lg))
         DonutChart(
@@ -254,7 +253,7 @@ private fun PeriodChartCard(ui: ExpensesUi) {
 
 @Composable
 private fun MonthHeader(ym: YearMonth, rows: List<GlobalExpense>, primary: String) {
-    val total = rows.filter { it.trip.currency.equals(primary, true) }.sumOf { it.converted ?: 0.0 }
+    val total = rows.sumOf { it.inHome ?: 0.0 }
     Row(
         Modifier.fillMaxWidth().padding(start = Space.gutter, end = Space.gutter, top = Space.xxl),
         verticalAlignment = Alignment.Bottom,

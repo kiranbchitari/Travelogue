@@ -6,6 +6,7 @@ import com.travelogue.app.core.designsystem.charts.ChartBar
 import com.travelogue.app.data.db.entity.*
 import com.travelogue.app.data.settings.AppSettings
 import com.travelogue.app.di.AppContainer
+import com.travelogue.app.domain.HomeConverter
 import com.travelogue.app.ui.trips.TripSummary
 import com.travelogue.app.ui.trips.buildTripSummaries
 import com.travelogue.app.ui.trips.converterFor
@@ -25,9 +26,9 @@ data class HomeState(
     val loaded: Boolean = false,
     val defaultCurrency: String = "INR",
     val tripCount: Int = 0,
-    /** Spend across trips whose currency is the default currency. */
+    /** Spend across every trip, converted to the default currency. */
     val primaryTotal: Double = 0.0,
-    /** Spend of trips in other currencies, by currency. */
+    /** Amounts with no exchange rate into the default currency yet, in their original currency. */
     val otherTotals: Map<String, Double> = emptyMap(),
     val placesCount: Int = 0,
     val travelDays: Int = 0,
@@ -65,9 +66,16 @@ class HomeViewModel(c: AppContainer) : ViewModel() {
         val currency = extras.settings.defaultCurrency
         val summaries = buildTripSummaries(core.trips, core.expenses, core.rates)
 
-        val totalsByCurrency = summaries.groupBy { it.trip.currency.uppercase() }.mapValues { (_, list) -> list.sumOf { it.total } }
-        val primary = totalsByCurrency[currency.uppercase()] ?: 0.0
-        val others = totalsByCurrency.filterKeys { it != currency.uppercase() }.filterValues { it > 0 }
+        val tripsById = core.trips.associateBy { it.id }
+        val ratesByTrip = core.rates.groupBy { it.tripId }
+        val converters = core.trips.associate { it.id to converterFor(it, ratesByTrip[it.id].orEmpty()) }
+        val home = HomeConverter(currency.uppercase(), extras.settings.exchangeRates)
+        val inHome = core.expenses.mapNotNull { e ->
+            if (tripsById[e.tripId] == null) null else e to home.convert(e.amount, e.currency, converters[e.tripId])
+        }
+        val primary = inHome.sumOf { it.second ?: 0.0 }
+        val others = inHome.filter { it.second == null }.groupBy { it.first.currency.uppercase() }
+            .mapValues { (_, rows) -> rows.sumOf { it.first.amount } }
 
         val travelDays = core.trips.filter { !it.startDate.isAfter(today) }.sumOf { t ->
             val end = if (t.endDate.isAfter(today)) today else t.endDate
@@ -78,18 +86,12 @@ class HomeViewModel(c: AppContainer) : ViewModel() {
         val upcoming = visible.filter { !it.trip.isPast(today) }.sortedBy { it.trip.startDate }
         val recent = visible.filter { it.trip.isPast(today) }.sortedByDescending { it.trip.endDate }.take(5)
 
-        // Monthly spend over the last 12 months, in the default currency.
-        val tripsById = core.trips.associateBy { it.id }
-        val ratesByTrip = core.rates.groupBy { it.tripId }
-        val converters = core.trips.associate { it.id to converterFor(it, ratesByTrip[it.id].orEmpty()) }
+        // Monthly spend over the last 12 months: every trip, in the default currency.
         val months = (11 downTo 0).map { YearMonth.from(today).minusMonths(it.toLong()) }
         val perMonth = HashMap<YearMonth, Double>()
-        core.expenses.forEach { e ->
-            val trip = tripsById[e.tripId] ?: return@forEach
-            if (!trip.currency.equals(currency, true)) return@forEach
+        inHome.forEach { (e, v) ->
             val ym = YearMonth.from(e.date)
-            if (ym !in months) return@forEach
-            val v = converters[trip.id]?.toBase(e.amount, e.currency) ?: return@forEach
+            if (v == null || ym !in months) return@forEach
             perMonth[ym] = (perMonth[ym] ?: 0.0) + v
         }
         val monthly = months.map { ChartBar(it.month.getDisplayName(TextStyle.SHORT, Locale.getDefault()), perMonth[it] ?: 0.0) }

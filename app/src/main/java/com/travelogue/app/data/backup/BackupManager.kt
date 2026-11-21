@@ -64,6 +64,7 @@ class BackupManager(
             themeMode = s.themeMode.name,
             travellers = db.travellerDao().getAll(),
             categories = db.expenseDao().getCategories(),
+            exchangeRates = s.exchangeRates.map { SettingsRepository.encodeRates(listOf(it)) },
         )
         writeArchive(target, BackupType.FULL, bundles, settingsArchive, progress)
     }
@@ -485,6 +486,7 @@ class BackupManager(
         s.categories.forEach { c -> if (c.name.isNotBlank() && db.expenseDao().findCategory(c.name) == null) db.expenseDao().insertCategory(c.copy(id = 0)) }
         settings.setDefaultCurrency(s.defaultCurrency)
         settings.setTheme(enumOr(s.themeMode, ThemeMode.SYSTEM))
+        SettingsRepository.decodeRates(s.exchangeRates.joinToString(";")).forEach { settings.setExchangeRate(it.from, it.to, it.rate) }
     }
 
     // =========================================================================================

@@ -5,6 +5,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -65,9 +66,28 @@ fun TripItineraryTab(nav: Nav, tripId: Long, modifier: Modifier = Modifier) {
 
     val bottomPad = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() + 96.dp
 
+    // Drag-and-drop: a local copy of the selected day's order that follows the finger, persisted on drop.
+    val dayActivities = selected?.let { state.activities(it.id) }.orEmpty()
+    var order by remember(selected?.id, dayActivities) { mutableStateOf(dayActivities.map { it.id }) }
+    val listState = rememberLazyListState()
+    val reorder = rememberReorderState(
+        listState = listState,
+        canReorder = { it is Long },
+        onMove = { from, to ->
+            val i = order.indexOf(from as Long)
+            val j = order.indexOf(to as Long)
+            if (i >= 0 && j >= 0) order = order.toMutableList().apply { add(j, removeAt(i)) }
+        },
+        onDrop = {
+            val day = selected
+            if (day != null && order != dayActivities.map { it.id }) vm.reorder(day.id, order)
+        },
+    )
+
     Box(modifier.fillMaxSize()) {
         LazyColumn(
             Modifier.fillMaxSize(),
+            state = listState,
             contentPadding = PaddingValues(top = Space.lg, bottom = bottomPad),
         ) {
             if (state.loading) {
@@ -87,7 +107,8 @@ fun TripItineraryTab(nav: Nav, tripId: Long, modifier: Modifier = Modifier) {
                     DayStrip(days, selected.id, { state.activities(it) }) { selectedDayId = it.id }
                     Spacer(Modifier.height(Space.xxl))
                 }
-                val activities = state.activities(selected.id)
+                val byId = dayActivities.associateBy { it.id }
+                val activities = order.mapNotNull { byId[it] }
                 item(key = "header-${selected.id}") {
                     DayHeader(selected, state.dayNumber(selected), activities, currency) { editDay = selected }
                 }
@@ -104,15 +125,32 @@ fun TripItineraryTab(nav: Nav, tripId: Long, modifier: Modifier = Modifier) {
                 } else {
                     item { Spacer(Modifier.height(Space.sm)) }
                     itemsIndexed(activities, key = { _, a -> a.id }) { i, a ->
-                        TimelineActivity(
-                            activity = a,
-                            isFirst = i == 0,
-                            isLast = i == activities.lastIndex,
-                            currency = currency,
-                            onClick = { nav.activityEditor(tripId, a.id, a.dayId) },
-                            onToggle = { vm.toggleCompleted(a) },
-                            onMore = { actionsFor = a },
-                        )
+                        val dragging = reorder.draggingKey == a.id
+                        Box(
+                            Modifier
+                                .animateItem(placementSpec = if (dragging) null else androidx.compose.animation.core.spring(stiffness = 600f))
+                                .reorderable(reorder, a.id),
+                        ) {
+                            TimelineActivity(
+                                activity = a,
+                                isFirst = i == 0,
+                                isLast = i == activities.lastIndex,
+                                currency = currency,
+                                onClick = { nav.activityEditor(tripId, a.id, a.dayId) },
+                                onToggle = { vm.toggleCompleted(a) },
+                                onMore = { actionsFor = a },
+                            )
+                        }
+                    }
+                    if (activities.size > 1) {
+                        item(key = "reorder-hint") {
+                            Text(
+                                "Press and hold an activity, then drag to reorder",
+                                style = Travel.type.bodySmall,
+                                color = Travel.colors.inkFaint,
+                                modifier = Modifier.fillMaxWidth().padding(start = Space.gutter + 86.dp, top = Space.sm),
+                            )
+                        }
                     }
                 }
                 item(key = "day-actions") {

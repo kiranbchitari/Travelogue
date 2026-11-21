@@ -85,4 +85,30 @@ class FinanceTest {
         // Paid-by attribution for unsplit expenses.
         assertEquals(5300.0, f.byPerson.first { it.travellerId == 1L }.total, 0.001)
     }
+
+    @Test fun homeConverterPrefersTripRatesThenSettings() {
+        val home = HomeConverter("INR", listOf(ExchangeRate("EUR", "INR", 90.0), ExchangeRate("INR", "JPY", 1.8)))
+        // Already home.
+        assertEquals(100.0, home.convert(100.0, "INR")!!, 0.001)
+        // INR trip with its own EUR rate: the trip's rate wins, matching the trip screens.
+        val inrTrip = CurrencyConverter("INR", mapOf("EUR" to 92.5))
+        assertEquals(925.0, home.convert(10.0, "EUR", inrTrip)!!, 0.001)
+        // EUR trip, EUR expense: trip currency → home via the Settings rate.
+        val eurTrip = CurrencyConverter("EUR", emptyMap())
+        assertEquals(900.0, home.convert(10.0, "EUR", eurTrip)!!, 0.001)
+        // JPY via the inverse Settings pair (1 INR = 1.8 JPY).
+        assertEquals(100.0, home.convert(180.0, "JPY")!!, 0.001)
+        // THB trip that priced INR itself: 1 INR = 0.4 THB → 40 THB = 100 INR.
+        val thbTrip = CurrencyConverter("THB", mapOf("INR" to 0.4))
+        assertEquals(100.0, home.convert(40.0, "THB", thbTrip)!!, 0.001)
+        // No chain of rates at all.
+        assertNull(home.convert(10.0, "USD", CurrencyConverter("USD", emptyMap())))
+    }
+
+    @Test fun exchangeRatesRoundTripThroughStorageFormat() {
+        val rates = listOf(ExchangeRate("EUR", "INR", 92.5), ExchangeRate("USD", "INR", 84.0))
+        val decoded = com.travelogue.app.data.settings.SettingsRepository.decodeRates(com.travelogue.app.data.settings.SettingsRepository.encodeRates(rates))
+        assertEquals(rates, decoded)
+        assertTrue(com.travelogue.app.data.settings.SettingsRepository.decodeRates("garbage;EU>INR=1;EUR>INR=-2").isEmpty())
+    }
 }
