@@ -11,3 +11,8 @@
 
 # Kotlin 2.x compiler caches
 .kotlin/
+
+# Release signing (never commit)
+keystore.properties
+*.jks
+*.keystore

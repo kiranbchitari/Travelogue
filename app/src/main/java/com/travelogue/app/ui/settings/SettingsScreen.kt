@@ -31,6 +31,7 @@ import com.travelogue.app.core.storage.StorageUsage
 import com.travelogue.app.core.util.CommonCurrencies
 import com.travelogue.app.core.util.Fmt
 import com.travelogue.app.ui.backup.rememberBackupImporter
+import com.travelogue.app.ui.backup.rememberDriveActions
 import com.travelogue.app.ui.backup.rememberFullBackupExporter
 import com.travelogue.app.ui.common.appViewModel
 import com.travelogue.app.ui.common.tabContentPadding
@@ -47,6 +48,7 @@ fun SettingsScreen(nav: Nav) {
     val context = LocalContext.current
     val exportAll = rememberFullBackupExporter()
     val importBackup = rememberBackupImporter()
+    val drive = rememberDriveActions()
     var confirmClear by remember { mutableStateOf(false) }
     var confirmDemoRemove by remember { mutableStateOf(false) }
 
@@ -98,10 +100,12 @@ fun SettingsScreen(nav: Nav) {
         item {
             SettingsGroup("Backup & restore") {
                 Text(
-                    "Everything lives only on this phone. Export a full backup regularly and keep it somewhere safe — any trip can also be exported on its own from the trip's menu.",
+                    "Everything lives on this phone. Back up to Google Drive or export a ZIP regularly — any trip can also be exported on its own from the trip's menu.",
                     style = Travel.type.body, color = Travel.colors.inkSoft,
                 )
                 Spacer(Modifier.height(Space.md))
+                ActionRow(Icons.Rounded.CloudUpload, "Back up to Google Drive", "Upload a full backup to your Drive", Travel.colors.secondary, drive.backup)
+                ActionRow(Icons.Rounded.CloudSync, "Restore from Google Drive", "Pick a backup saved in your Drive", Travel.colors.secondary, drive.restore)
                 ActionRow(Icons.Rounded.CloudDownload, "Export all data", "Save a complete ZIP backup", Travel.colors.secondary, exportAll)
                 ActionRow(Icons.Rounded.Restore, "Import backup or trip", "Restore from a Travelogue ZIP", Travel.colors.secondary, importBackup)
             }
@@ -128,7 +132,7 @@ fun SettingsScreen(nav: Nav) {
                 Text("Travelogue", style = Travel.type.title, color = Travel.colors.ink)
                 Text("Version ${BuildConfig.VERSION_NAME}", style = Travel.type.bodySmall, color = Travel.colors.inkFaint)
                 Spacer(Modifier.height(Space.sm))
-                Text("Offline · No account · No tracking", style = Travel.type.bodySmall, color = Travel.colors.inkFaint)
+                Text("Offline-first · Optional Drive backup · No tracking", style = Travel.type.bodySmall, color = Travel.colors.inkFaint)
             }
         }
     }

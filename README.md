@@ -11,7 +11,9 @@ Requirements: Android Studio (2026.1+) or JDK 17+, plus the Android SDK with pla
 ```bash
 ./gradlew :app:assembleDebug          # debug APK  → app/build/outputs/apk/debug/
 ./gradlew :app:installDebug           # install on a connected device/emulator
-./gradlew :app:assembleRelease        # minified release APK (signed with the debug key for personal use)
+./gradlew :app:assembleRelease        # minified release APK (upload key if keystore.properties exists, else debug key)
+./gradlew :app:bundleRelease         # signed .aab for the Play Store → app/build/outputs/bundle/release/
+./gradlew :app:assembleRelease -Ps24  # same, trimmed for a Galaxy S24 Ultra: Android 14+, arm64 only, English only
 ./gradlew :app:testDebugUnitTest      # finance/split unit tests
 ./gradlew :app:connectedDebugAndroidTest  # on-device export → import round-trip tests
 ```

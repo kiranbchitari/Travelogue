@@ -1,6 +1,23 @@
 package com.travelogue.app.ui.backup
 
+import android.app.Activity
+import android.content.Context
 import android.net.Uri
+import androidx.activity.result.IntentSenderRequest
+import androidx.compose.foundation.clickable
+import androidx.compose.material.icons.rounded.Restore
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.LocalContext
+import com.google.android.gms.auth.api.identity.AuthorizationRequest
+import com.google.android.gms.auth.api.identity.Identity
+import com.google.android.gms.common.api.Scope
+import com.travelogue.app.data.backup.DriveClient
+import java.io.File
+import java.time.Instant
+import java.time.LocalTime
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
+import java.util.UUID
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.*
@@ -44,6 +61,7 @@ sealed interface BackupUiState {
     data class Preview(val session: BackupManager.ImportSession) : BackupUiState
     data class Done(val title: String, val message: String) : BackupUiState
     data class Failed(val message: String) : BackupUiState
+    data class DrivePicker(val token: String, val files: List<DriveClient.DriveFile>) : BackupUiState
 }
 
 /** App-wide export/import runner. Work runs in the application scope so it survives navigation. */
@@ -95,6 +113,59 @@ object BackupController {
     fun cancelPreview(c: AppContainer, session: BackupManager.ImportSession) {
         c.backup.discard(session)
         _state.value = BackupUiState.Idle
+    }
+
+    /** Shows a spinner while Google authorization is in flight. */
+    fun connecting() { _state.value = BackupUiState.Working("Google Drive", 0f, "Connecting to your Google account…") }
+
+    fun failed(message: String) { _state.value = BackupUiState.Failed(message) }
+
+    /** Writes a full backup to app cache, then uploads it to the "Travelogue Backups" Drive folder. */
+    fun driveBackup(c: AppContainer, context: Context, token: String) = c.appScope.launch {
+        run("Backing up to Drive") {
+            val name = BackupManager.backupFileName().removeSuffix(".zip") + "_" + LocalTime.now().format(DateTimeFormatter.ofPattern("HHmm")) + ".zip"
+            val temp = File(context.cacheDir, "drive-${UUID.randomUUID()}.zip")
+            try {
+                val r = c.backup.exportAll(Uri.fromFile(temp)) { f, m -> _state.value = BackupUiState.Working("Backing up to Drive", f * 0.4f, m) }
+                DriveClient(token).upload(temp, name) { f ->
+                    _state.value = BackupUiState.Working("Backing up to Drive", 0.4f + f * 0.6f, "Uploading ${Fmt.bytes(temp.length())}")
+                }
+                val holidays = if (r.holidays > 0) ", ${daysOff(r.holidays)}" else ""
+                BackupUiState.Done(
+                    "Saved to Google Drive",
+                    "${if (r.trips == 1) "1 trip" else "${r.trips} trips"}$holidays and ${if (r.files == 1) "1 file" else "${r.files} files"} " +
+                        "(${Fmt.bytes(temp.length())}) uploaded to “App Backups › Travelogue Backups” as $name.",
+                )
+            } finally {
+                temp.delete()
+            }
+        }
+    }
+
+    /** Lists the backups in Drive so the user can pick one to restore. */
+    fun driveList(c: AppContainer, token: String) = c.appScope.launch {
+        run("Google Drive") {
+            _state.value = BackupUiState.Working("Google Drive", 0.2f, "Looking for backups…")
+            val files = DriveClient(token).list()
+            if (files.isEmpty()) BackupUiState.Done("No backups yet", "There are no Travelogue backups in your Google Drive. Use “Back up to Google Drive” first.")
+            else BackupUiState.DrivePicker(token, files)
+        }
+    }
+
+    /** Downloads the chosen backup and hands it to the normal import preview. */
+    fun driveRestore(c: AppContainer, context: Context, token: String, file: DriveClient.DriveFile) = c.appScope.launch {
+        run("Downloading backup") {
+            val temp = File(context.cacheDir, "drive-${UUID.randomUUID()}.zip")
+            try {
+                DriveClient(token).download(file, temp) { f ->
+                    _state.value = BackupUiState.Working("Downloading backup", f * 0.8f, "${file.name} · ${Fmt.bytes(file.size)}")
+                }
+                val session = c.backup.inspect(Uri.fromFile(temp)) { f, m -> _state.value = BackupUiState.Working("Checking archive", 0.8f + f * 0.2f, m) }
+                BackupUiState.Preview(session)
+            } finally {
+                temp.delete()
+            }
+        }
     }
 
     private fun daysOff(n: Int) = if (n == 1) "1 day off" else "$n days off"
@@ -155,6 +226,7 @@ fun rememberBackupImporter(): () -> Unit {
 @Composable
 fun BackupHost() {
     val c = appContainer()
+    val context = LocalContext.current
     val state by BackupController.state.collectAsStateWithLifecycle()
     when (val s = state) {
         BackupUiState.Idle -> Unit
@@ -180,8 +252,91 @@ fun BackupHost() {
         )
         is BackupUiState.Done -> ResultDialog(Icons.Rounded.CheckCircle, Travel.colors.success, s.title, s.message)
         is BackupUiState.Failed -> ResultDialog(Icons.Rounded.ErrorOutline, Travel.colors.danger, "Couldn't complete", s.message)
+        is BackupUiState.DrivePicker -> DrivePickerDialog(s.files) { BackupController.driveRestore(c, context, s.token, it) }
     }
 }
+
+/**
+ * Google Drive backup and restore. Each action asks for the `drive.file` scope through the Google
+ * Identity authorization API (showing Google's consent sheet the first time), then runs.
+ */
+class DriveActions(val backup: () -> Unit, val restore: () -> Unit)
+
+@Composable
+fun rememberDriveActions(): DriveActions {
+    val c = appContainer()
+    val context = LocalContext.current
+    var pending by rememberSaveable { mutableStateOf<String?>(null) }
+
+    fun proceed(op: String?, token: String) {
+        when (op) {
+            OP_BACKUP -> BackupController.driveBackup(c, context.applicationContext, token)
+            OP_RESTORE -> BackupController.driveList(c, token)
+            else -> BackupController.dismiss()
+        }
+    }
+
+    val launcher = rememberLauncherForActivityResult(ActivityResultContracts.StartIntentSenderForResult()) { res ->
+        val op = pending
+        pending = null
+        if (res.resultCode != Activity.RESULT_OK) { BackupController.dismiss(); return@rememberLauncherForActivityResult }
+        val token = runCatching { Identity.getAuthorizationClient(context).getAuthorizationResultFromIntent(res.data).accessToken }.getOrNull()
+        if (token == null) BackupController.failed("Google didn't grant access to Drive.") else proceed(op, token)
+    }
+
+    fun start(op: String) {
+        pending = op
+        BackupController.connecting()
+        val request = AuthorizationRequest.builder().setRequestedScopes(listOf(Scope(DriveClient.SCOPE))).build()
+        Identity.getAuthorizationClient(context).authorize(request)
+            .addOnSuccessListener { result ->
+                val intent = result.pendingIntent
+                if (result.hasResolution() && intent != null) {
+                    launcher.launch(IntentSenderRequest.Builder(intent.intentSender).build())
+                } else {
+                    pending = null
+                    result.accessToken?.let { proceed(op, it) } ?: BackupController.failed("Google didn't grant access to Drive.")
+                }
+            }
+            .addOnFailureListener { e ->
+                pending = null
+                BackupController.failed("Couldn't connect to Google: ${e.message ?: e.javaClass.simpleName}")
+            }
+    }
+
+    return remember { DriveActions(backup = { start(OP_BACKUP) }, restore = { start(OP_RESTORE) }) }
+}
+
+private const val OP_BACKUP = "backup"
+private const val OP_RESTORE = "restore"
+
+@Composable
+private fun DrivePickerDialog(files: List<DriveClient.DriveFile>, onPick: (DriveClient.DriveFile) -> Unit) {
+    AlertDialog(
+        onDismissRequest = BackupController::dismiss,
+        containerColor = Travel.colors.cardHigh,
+        shape = Shapes.lg,
+        icon = { IconBadge(Icons.Rounded.Restore, Travel.colors.accent, size = 52.dp, iconSize = 26.dp) },
+        title = { Text("Restore from Drive", style = Travel.type.title, color = Travel.colors.ink) },
+        text = {
+            Column(Modifier.heightIn(max = 380.dp).verticalScroll(rememberScrollState())) {
+                Text("Choose a backup. You'll see what's inside before anything is imported.", style = Travel.type.bodySmall, color = Travel.colors.inkFaint)
+                Spacer(Modifier.height(Space.md))
+                files.forEach { f ->
+                    Column(Modifier.fillMaxWidth().clip(Shapes.md).clickable { onPick(f) }.padding(vertical = 8.dp)) {
+                        Text(f.name, style = Travel.type.titleSmall, color = Travel.colors.ink)
+                        Text(driveDate(f.createdTime) + " · " + Fmt.bytes(f.size), style = Travel.type.bodySmall, color = Travel.colors.inkSoft)
+                    }
+                }
+            }
+        },
+        confirmButton = { TextButton(onClick = BackupController::dismiss) { Text("Cancel", color = Travel.colors.inkSoft) } },
+    )
+}
+
+private fun driveDate(iso: String): String = runCatching {
+    Instant.parse(iso).atZone(ZoneId.systemDefault()).format(DateTimeFormatter.ofPattern("d MMM yyyy, HH:mm"))
+}.getOrDefault(iso)
 
 @Composable
 private fun ResultDialog(icon: androidx.compose.ui.graphics.vector.ImageVector, tint: androidx.compose.ui.graphics.Color, title: String, message: String) {
