@@ -279,8 +279,8 @@ fun ProgressBar(
 }
 
 /**
- * A headline amount: the currency symbol and any decimals are dimmed so the whole number carries
- * the weight. [text] is an already formatted amount such as "₹5,46,931.50" or "₹2.4L".
+ * A headline amount such as "₹5,46,931.50" or "₹2.4L", set in the serif number face. The currency
+ * symbol and decimals are the same ink as the digits: dimming them made the amount hard to read.
  */
 @Composable
 fun MoneyText(
@@ -288,16 +288,6 @@ fun MoneyText(
     modifier: Modifier = Modifier,
     style: androidx.compose.ui.text.TextStyle = Travel.type.number,
     color: Color = Travel.colors.ink,
-    dim: Color = Travel.colors.inkFaint,
 ) {
-    val firstDigit = text.indexOfFirst { it.isDigit() }.coerceAtLeast(0)
-    val lastSep = text.lastIndexOfAny(charArrayOf('.', ','))
-    // Only a separator followed by exactly two digits at the very end is a decimal part.
-    val decimals = if (lastSep >= 0 && text.length - lastSep == 3 && text.substring(lastSep + 1).all { it.isDigit() }) lastSep else text.length
-    val annotated = androidx.compose.ui.text.buildAnnotatedString {
-        pushStyle(androidx.compose.ui.text.SpanStyle(color = dim)); append(text.substring(0, firstDigit)); pop()
-        append(text.substring(firstDigit, decimals))
-        pushStyle(androidx.compose.ui.text.SpanStyle(color = dim)); append(text.substring(decimals)); pop()
-    }
-    Text(annotated, modifier = modifier, style = style, color = color, maxLines = 1, overflow = TextOverflow.Ellipsis)
+    Text(text, modifier = modifier, style = style, color = color, maxLines = 1, overflow = TextOverflow.Ellipsis)
 }

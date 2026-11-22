@@ -55,6 +55,7 @@ import com.travelogue.app.ui.diary.DiaryEditorScreen
 import com.travelogue.app.ui.expenses.ExpenseEditorScreen
 import com.travelogue.app.ui.expenses.ExpensesScreen
 import com.travelogue.app.ui.expenses.TripFinanceScreen
+import com.travelogue.app.ui.holidays.HolidayPlannerScreen
 import com.travelogue.app.ui.home.HomeScreen
 import com.travelogue.app.ui.hotels.HotelDetailScreen
 import com.travelogue.app.ui.hotels.HotelEditorScreen
@@ -72,6 +73,7 @@ import com.travelogue.app.ui.settings.SettingsScreen
 import com.travelogue.app.ui.trips.TripsScreen
 import com.travelogue.app.ui.trips.detail.TripDetailScreen
 import com.travelogue.app.ui.trips.editor.TripEditorScreen
+import java.time.LocalDate
 
 private data class TabItem(val route: Any, val label: String, val icon: ImageVector, val selectedIcon: ImageVector)
 
@@ -107,7 +109,11 @@ fun AppRoot() {
             composable<MemoriesRoute>(enterTransition = { fadeIn(tween(220)) }, exitTransition = { fadeOut(tween(180)) }) { MemoriesScreen(nav) }
             composable<SettingsRoute>(enterTransition = { fadeIn(tween(220)) }, exitTransition = { fadeOut(tween(180)) }) { SettingsScreen(nav) }
 
-            composable<TripEditorRoute> { val r = it.toRoute<TripEditorRoute>(); TripEditorScreen(nav, r.tripId) }
+            composable<TripEditorRoute> {
+                val r = it.toRoute<TripEditorRoute>()
+                TripEditorScreen(nav, r.tripId, r.startDay.takeIf { d -> d > 0 }?.let(LocalDate::ofEpochDay), r.endDay.takeIf { d -> d > 0 }?.let(LocalDate::ofEpochDay))
+            }
+            composable<HolidayPlannerRoute> { HolidayPlannerScreen(nav) }
             composable<TripDetailRoute> { val r = it.toRoute<TripDetailRoute>(); TripDetailScreen(nav, r.tripId, r.tab) }
             composable<TripFinanceRoute> { TripFinanceScreen(nav, it.toRoute<TripFinanceRoute>().tripId) }
             composable<TripTimelineRoute> { TripTimelineScreen(nav, it.toRoute<TripTimelineRoute>().tripId) }

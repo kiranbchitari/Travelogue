@@ -37,8 +37,8 @@ minSdk 26, targetSdk 36, compileSdk 37.
 | `data/db` | Room entities, DAOs, converters, `AppDatabase` (explicit migrations only) |
 | `data/repository` | Trip, expense, journal (hotels/itinerary/places/bookings/contacts), diary and photo repositories |
 | `data/backup` | ZIP export/import (`BackupManager`), archive format, demo data seeder |
-| `domain` | Pure-Kotlin money logic: manual currency conversion, splits, balances, who-owes-whom, trip analytics |
-| `ui/*` | One package per feature: home, trips, expenses, itinerary, hotels, places, bookings, contacts, diary, memories, settings, backup |
+| `domain` | Pure-Kotlin logic: manual currency conversion, splits, balances, who-owes-whom, trip analytics, and the holiday planner: shared-break finder, leave ideas, and India's public holidays (`IndianHolidays.kt` — add each new year's festival dates there when the government list is published) |
+| `ui/*` | One package per feature: home, trips, expenses, itinerary, hotels, places, bookings, contacts, diary, memories, holidays, settings, backup |
 
 ## Data
 
@@ -65,7 +65,7 @@ Travelogue_<Trip_Name>.zip
 ```
 
 A full backup (Settings → Export all data) contains `manifest.json`, `settings.json` (travellers,
-categories, default currency, theme) and one `trips/<uuid>/` folder per trip with the layout above.
+categories, default currency, theme, and the holiday planner's days off, names and weekly days off) and one `trips/<uuid>/` folder per trip with the layout above.
 
 Before anything is written, an import:
 - checks the ZIP and its `manifest.json`;

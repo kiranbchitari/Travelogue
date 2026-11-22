@@ -35,7 +35,13 @@ data class TripFormErrors(
     val any: Boolean get() = listOf(name, destination, startDate, endDate, travellerCount, budget).any { it != null }
 }
 
-class TripEditorViewModel(private val c: AppContainer, val tripId: Long) : ViewModel(), DraftHolder {
+class TripEditorViewModel(
+    private val c: AppContainer,
+    val tripId: Long,
+    /** Dates to start a new trip with, e.g. a break picked in the holiday planner. */
+    presetStart: LocalDate? = null,
+    presetEnd: LocalDate? = null,
+) : ViewModel(), DraftHolder {
     val isNew = tripId == 0L
 
     var loading by mutableStateOf(!isNew); private set
@@ -93,6 +99,8 @@ class TripEditorViewModel(private val c: AppContainer, val tripId: Long) : ViewM
         viewModelScope.launch {
             if (isNew) {
                 currency = c.settings.current().defaultCurrency
+                presetStart?.let(::setStart)
+                presetEnd?.takeIf { presetStart == null || !it.isBefore(presetStart) }?.let(::setEnd)
             } else {
                 val t = c.trips.get(tripId)
                 if (t == null) {

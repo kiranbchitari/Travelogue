@@ -1,5 +1,7 @@
 package com.travelogue.app.data.repository
 
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import android.net.Uri
 import androidx.room.withTransaction
 import com.travelogue.app.core.storage.MediaStorage
@@ -66,7 +68,10 @@ class ExpenseRepository(private val db: AppDatabase, private val media: MediaSto
 
     // Categories --------------------------------------------------------------------------------
 
-    suspend fun ensureDefaultCategories() {
+    /** App start-up, loading sample trips and clearing data can all get here at once; only one may insert. */
+    private val defaultCategoriesLock = Mutex()
+
+    suspend fun ensureDefaultCategories() = defaultCategoriesLock.withLock {
         if (dao.categoryCount() == 0) dao.insertCategories(DefaultCategories.all)
     }
 

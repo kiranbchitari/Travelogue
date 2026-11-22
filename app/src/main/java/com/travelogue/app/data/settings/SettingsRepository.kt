@@ -8,9 +8,12 @@ import androidx.datastore.preferences.preferencesDataStore
 import com.travelogue.app.core.designsystem.theme.ThemeMode
 import com.travelogue.app.data.db.enumOr
 import com.travelogue.app.domain.ExchangeRate
+import com.travelogue.app.domain.HolidayPrefs
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
+import java.time.DayOfWeek
 
 private val Context.dataStore by preferencesDataStore(name = "settings")
 
@@ -29,6 +32,11 @@ class SettingsRepository(private val context: Context) {
         val demo = booleanPreferencesKey("demo_loaded")
         val rates = stringPreferencesKey("exchange_rates")
         val demoTravellers = stringPreferencesKey("demo_travellers")
+        val holidayMyName = stringPreferencesKey("holiday_my_name")
+        val holidayPartnerName = stringPreferencesKey("holiday_partner_name")
+        val holidayMyWeeklyOff = stringPreferencesKey("holiday_my_weekly_off")
+        val holidayPartnerWeeklyOff = stringPreferencesKey("holiday_partner_weekly_off")
+        val holidayShowIndian = booleanPreferencesKey("holiday_show_indian")
     }
 
     val settings: Flow<AppSettings> = context.dataStore.data.map { p ->
@@ -41,6 +49,27 @@ class SettingsRepository(private val context: Context) {
     }
 
     suspend fun current(): AppSettings = settings.first()
+
+    /** Names and weekly days off for the two holiday calendars. */
+    val holidayPrefs: Flow<HolidayPrefs> = context.dataStore.data.map { p ->
+        HolidayPrefs(
+            myName = p[Keys.holidayMyName]?.takeIf { it.isNotBlank() } ?: HolidayPrefs.DEFAULT_MY_NAME,
+            partnerName = p[Keys.holidayPartnerName]?.takeIf { it.isNotBlank() } ?: HolidayPrefs.DEFAULT_PARTNER_NAME,
+            myWeeklyOff = decodeWeekdays(p[Keys.holidayMyWeeklyOff]),
+            partnerWeeklyOff = decodeWeekdays(p[Keys.holidayPartnerWeeklyOff]),
+            showIndianHolidays = p[Keys.holidayShowIndian] ?: true,
+        )
+    }.distinctUntilChanged()
+
+    suspend fun setHolidayPrefs(prefs: HolidayPrefs) {
+        context.dataStore.edit {
+            it[Keys.holidayMyName] = prefs.myName.trim().take(HolidayPrefs.MAX_NAME)
+            it[Keys.holidayPartnerName] = prefs.partnerName.trim().take(HolidayPrefs.MAX_NAME)
+            it[Keys.holidayMyWeeklyOff] = encodeWeekdays(prefs.myWeeklyOff)
+            it[Keys.holidayPartnerWeeklyOff] = encodeWeekdays(prefs.partnerWeeklyOff)
+            it[Keys.holidayShowIndian] = prefs.showIndianHolidays
+        }
+    }
 
     suspend fun setTheme(mode: ThemeMode) { context.dataStore.edit { it[Keys.theme] = mode.name } }
     suspend fun setDefaultCurrency(code: String) { context.dataStore.edit { it[Keys.currency] = code.uppercase() } }
@@ -70,6 +99,13 @@ class SettingsRepository(private val context: Context) {
     }
 
     companion object {
+        /** ISO weekday numbers, Monday = 1: "6,7". An empty string means no weekly day off at all. */
+        fun encodeWeekdays(days: Set<DayOfWeek>): String = days.map { it.value }.sorted().joinToString(",")
+
+        /** Absent (never set) falls back to Saturday and Sunday. */
+        fun decodeWeekdays(raw: String?): Set<DayOfWeek> =
+            raw?.split(',')?.mapNotNull { it.trim().toIntOrNull()?.takeIf { n -> n in 1..7 }?.let(DayOfWeek::of) }?.toSet() ?: HolidayPrefs.Weekend
+
         /** Stored as "EUR>INR=92.5;USD>INR=84". */
         fun encodeRates(rates: List<ExchangeRate>): String = rates.joinToString(";") { "${it.from}>${it.to}=${it.rate}" }
 

@@ -3,4 +3,6 @@
     <color name="ink">#0E0E0E</color>
     <color name="terracotta">#DD552B</color>
     <color name="ic_background">#0E0E0E</color>
+    <!-- Start-up mark: ink on paper, and paper on black in the dark theme (values-night). -->
+    <color name="splash_mark">#0E0E0E</color>
 </resources>

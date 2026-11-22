@@ -16,21 +16,19 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import com.travelogue.app.core.designsystem.theme.Shapes
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.travelogue.app.core.designsystem.charts.BarChart
 import com.travelogue.app.core.designsystem.components.*
 import com.travelogue.app.core.designsystem.theme.Space
 import com.travelogue.app.core.designsystem.theme.Travel
 import com.travelogue.app.core.util.Fmt
 import com.travelogue.app.ui.common.appViewModel
 import com.travelogue.app.ui.common.tabContentPadding
+import com.travelogue.app.ui.holidays.HolidayHomeCard
 import com.travelogue.app.ui.navigation.Nav
 import com.travelogue.app.ui.navigation.TripTab
 import com.travelogue.app.ui.navigation.TripsRoute
-import com.travelogue.app.ui.trips.ExpenseLineRow
 import com.travelogue.app.ui.trips.MemoryTile
 import com.travelogue.app.ui.trips.TripHeroCard
 import com.travelogue.app.ui.trips.TripRow
@@ -52,10 +50,12 @@ fun HomeScreen(nav: Nav) {
 
         if (s.tripCount == 0) {
             item { FirstRun(onCreate = nav::newTrip) }
+            item { HolidayHomeCard(nav::holidays, Modifier.padding(horizontal = Space.gutter).padding(top = Space.xl)) }
             return@LazyColumn
         }
 
         item { Ledger(s, onCreate = nav::newTrip) }
+        item { HolidayHomeCard(nav::holidays, Modifier.padding(horizontal = Space.gutter).padding(top = Space.md)) }
 
         if (s.upcoming.isNotEmpty()) {
             item {
@@ -95,43 +95,6 @@ fun HomeScreen(nav: Nav) {
                     s.recent.forEachIndexed { i, t ->
                         if (i > 0) Hairline()
                         TripRow(t, onClick = { nav.trip(t.trip.id) })
-                    }
-                }
-            }
-        }
-
-        item {
-            SectionHeader(
-                "Monthly spending",
-                subtitle = "Last 12 months · all trips in ${s.defaultCurrency}",
-                modifier = Modifier.padding(horizontal = Space.gutter).padding(top = Space.xxxl, bottom = Space.md),
-            )
-            SurfaceCard(Modifier.padding(horizontal = Space.gutter).fillMaxWidth()) {
-                Overline("Spent across the year")
-                Spacer(Modifier.height(6.dp))
-                MoneyText(Fmt.money(s.monthlyTotal, s.defaultCurrency))
-                Spacer(Modifier.height(2.dp))
-                Text("tap a bar for details", style = Travel.type.bodySmall, color = Travel.colors.inkFaint)
-                Spacer(Modifier.height(Space.md))
-                BarChart(s.monthly, valueLabel = { Fmt.money(it, s.defaultCurrency) }, height = 150.dp)
-            }
-        }
-
-        if (s.recentExpenses.isNotEmpty()) {
-            item {
-                SectionHeader(
-                    "Recent expenses",
-                    modifier = Modifier.padding(horizontal = Space.gutter).padding(top = Space.xxxl, bottom = Space.sm),
-                )
-                SurfaceCard(Modifier.padding(horizontal = Space.gutter).fillMaxWidth(), contentPadding = PaddingValues(horizontal = Space.lg, vertical = Space.sm)) {
-                    s.recentExpenses.forEachIndexed { i, line ->
-                        if (i > 0) Hairline()
-                        ExpenseLineRow(
-                            line.expense,
-                            line.category,
-                            subtitle = "${line.tripName} · ${Fmt.dayMonth(line.expense.date)}",
-                            onClick = { nav.expenseEditor(line.expense.tripId, line.expense.id) },
-                        )
                     }
                 }
             }
@@ -184,31 +147,13 @@ private fun Greeting() {
 }
 
 /**
- * The opening statement of the home screen: one headline figure, three supporting counts divided by
- * hairlines, and the main action, all on a single card.
+ * The opening statement of the home screen: three counts divided by hairlines and the main action,
+ * on a single card. Money is left to the Expenses tab; home is about the journeys.
  */
 @Composable
 private fun Ledger(s: HomeState, onCreate: () -> Unit) {
     val c = Travel.colors
     SurfaceCard(Modifier.padding(horizontal = Space.gutter).fillMaxWidth(), contentPadding = PaddingValues(0.dp)) {
-        Column(Modifier.fillMaxWidth().padding(horizontal = Space.xl).padding(top = Space.xxl, bottom = Space.xl), horizontalAlignment = Alignment.CenterHorizontally) {
-            Overline("Spent on travel · ${s.defaultCurrency}")
-            Spacer(Modifier.height(Space.sm))
-            MoneyText(
-                Fmt.money(s.primaryTotal, s.defaultCurrency),
-                style = Travel.type.display.copy(fontSize = 40.sp, lineHeight = 44.sp),
-            )
-            if (s.otherTotals.isNotEmpty()) {
-                Spacer(Modifier.height(Space.sm))
-                Text(
-                    s.otherTotals.entries.joinToString(" · ", postfix = " without a rate") { "+" + Fmt.money(it.value, it.key, compact = true) },
-                    style = Travel.type.bodySmall,
-                    color = c.inkFaint,
-                    textAlign = TextAlign.Center,
-                )
-            }
-        }
-        Hairline()
         Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min), verticalAlignment = Alignment.CenterVertically) {
             Figure(s.tripCount.toString(), if (s.tripCount == 1) "Trip" else "Trips", Modifier.weight(1f))
             Box(Modifier.width(1.dp).fillMaxHeight().background(c.line))

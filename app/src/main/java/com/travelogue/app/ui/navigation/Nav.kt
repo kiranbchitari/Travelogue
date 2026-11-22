@@ -4,6 +4,7 @@ import androidx.compose.runtime.Stable
 import androidx.lifecycle.Lifecycle
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.NavHostController
+import java.time.LocalDate
 
 /**
  * Navigation actions available to every screen. Screens never touch the NavController directly,
@@ -28,6 +29,9 @@ class Nav(val controller: NavHostController) {
     }
 
     fun newTrip() = go(TripEditorRoute())
+    /** A new trip with its dates already filled in, e.g. from a break found in the holiday planner. */
+    fun planTrip(start: LocalDate, end: LocalDate) = go(TripEditorRoute(startDay = start.toEpochDay(), endDay = end.toEpochDay()))
+    fun holidays() = go(HolidayPlannerRoute)
     fun editTrip(tripId: Long) = go(TripEditorRoute(tripId))
     fun trip(tripId: Long, tab: Int = TripTab.OVERVIEW) = go(TripDetailRoute(tripId, tab))
     fun tripFinance(tripId: Long) = go(TripFinanceRoute(tripId))

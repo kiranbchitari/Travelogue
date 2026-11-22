@@ -75,6 +75,20 @@ data class SettingsArchive(
     val categories: List<ExpenseCategoryEntity> = emptyList(),
     /** "EUR>INR=92.5" entries (Settings → Exchange rates). */
     val exchangeRates: List<String> = emptyList(),
+    /** Holiday planner: every marked day off for both people. */
+    val holidays: List<HolidayEntity> = emptyList(),
+    /** Holiday planner names and weekly days off; absent in backups made before the planner existed. */
+    val holidayPrefs: HolidayPrefsArchive? = null,
+)
+
+@Serializable
+data class HolidayPrefsArchive(
+    val myName: String = "",
+    val partnerName: String = "",
+    /** ISO weekday numbers, Monday = 1. */
+    val myWeeklyOff: List<Int> = listOf(6, 7),
+    val partnerWeeklyOff: List<Int> = listOf(6, 7),
+    val showIndianHolidays: Boolean = true,
 )
 
 val BackupJson = Json {
@@ -92,6 +106,8 @@ data class ImportPreview(
     val trips: List<PreviewTrip>,
     val totalFiles: Int,
     val totalBytes: Long,
+    /** Marked days off in a full backup's holiday planner. */
+    val holidays: Int = 0,
 ) {
     val duplicates: List<PreviewTrip> get() = trips.filter { it.alreadyExists }
 }
@@ -106,8 +122,8 @@ data class PreviewTrip(
 
 enum class DuplicateStrategy { SKIP, REPLACE, KEEP_BOTH }
 
-data class ImportResult(val imported: Int, val skipped: Int, val warnings: List<String>)
-data class ExportResult(val trips: Int, val files: Int, val bytes: Long, val missingFiles: Int)
+data class ImportResult(val imported: Int, val skipped: Int, val warnings: List<String>, val holidays: Int = 0)
+data class ExportResult(val trips: Int, val files: Int, val bytes: Long, val missingFiles: Int, val holidays: Int = 0)
 
 /** Progress callback: fraction 0..1 and a short human message. */
 typealias Progress = (fraction: Float, message: String) -> Unit

@@ -13,7 +13,9 @@ import com.travelogue.app.data.db.entity.*
 import com.travelogue.app.data.db.enumOr
 import com.travelogue.app.data.repository.ExpenseRepository
 import com.travelogue.app.data.settings.SettingsRepository
+import com.travelogue.app.domain.HolidayPrefs
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.SerializationException
@@ -38,6 +40,9 @@ import java.util.zip.ZipOutputStream
  *   images/cover|hotels|places|     trips/<uuid>/trip.json
  *          diary|receipts|...       trips/<uuid>/images/...
  *   documents/                      trips/<uuid>/documents/...
+ *
+ * settings.json also carries what belongs to no trip: travellers, categories, exchange rates and the
+ * holiday planner's days off.
  */
 class BackupManager(
     private val context: Context,
@@ -60,14 +65,24 @@ class BackupManager(
         val ids = db.tripDao().getAll().map { it.id }
         val bundles = ids.mapNotNull { collect(it) }
         val s = settings.current()
+        val holidayPrefs = settings.holidayPrefs.first()
+        val holidays = db.holidayDao().getAll()
         val settingsArchive = SettingsArchive(
             defaultCurrency = s.defaultCurrency,
             themeMode = s.themeMode.name,
             travellers = db.travellerDao().getAll(),
             categories = db.expenseDao().getCategories(),
             exchangeRates = s.exchangeRates.map { SettingsRepository.encodeRates(listOf(it)) },
+            holidays = holidays,
+            holidayPrefs = HolidayPrefsArchive(
+                myName = holidayPrefs.myName,
+                partnerName = holidayPrefs.partnerName,
+                myWeeklyOff = holidayPrefs.myWeeklyOff.map { it.value }.sorted(),
+                partnerWeeklyOff = holidayPrefs.partnerWeeklyOff.map { it.value }.sorted(),
+                showIndianHolidays = holidayPrefs.showIndianHolidays,
+            ),
         )
-        writeArchive(target, BackupType.FULL, bundles, settingsArchive, progress)
+        writeArchive(target, BackupType.FULL, bundles, settingsArchive, progress).copy(holidays = holidays.size)
     }
 
     /** A trip archive plus the on-disk files it references (archive path -> file). */
@@ -272,7 +287,7 @@ class BackupManager(
                 counts = counts,
             )
         }
-        val preview = ImportPreview(manifest.type, manifest.exportedAt, previews, manifest.files.size, declaredTotal)
+        val preview = ImportPreview(manifest.type, manifest.exportedAt, previews, manifest.files.size, declaredTotal, settingsArchive?.holidays?.size ?: 0)
         return ImportSession(temp, manifest, archives, settingsArchive, preview)
     }
 
@@ -317,9 +332,10 @@ class BackupManager(
         val warnings = mutableListOf<String>()
         var imported = 0
         var skipped = 0
+        var holidays = 0
         try {
             ZipFile(session.file).use { zip ->
-                session.settingsArchive?.let { restoreSettings(it) }
+                session.settingsArchive?.let { holidays = restoreSettings(it) }
                 val n = session.archives.size.coerceAtLeast(1)
                 session.archives.forEachIndexed { index, (mt, archive) ->
                     val base = index.toFloat() / n
@@ -345,7 +361,7 @@ class BackupManager(
             session.file.delete()
         }
         progress(1f, "Done")
-        ImportResult(imported, skipped, warnings)
+        ImportResult(imported, skipped, warnings, holidays)
     } }
 
     /** Imports and the start-up recovery below both move files through staging folders; never at once. */
@@ -542,12 +558,37 @@ class BackupManager(
     private fun localSubPath(archivePath: String): String =
         if (archivePath.startsWith("images/")) archivePath.removePrefix("images/") else archivePath
 
-    private suspend fun restoreSettings(s: SettingsArchive) {
+    /** Restores everything in settings.json and returns how many days off were added to the holiday planner. */
+    private suspend fun restoreSettings(s: SettingsArchive): Int {
         s.travellers.forEach { t -> if (t.name.isNotBlank() && db.travellerDao().findByName(t.name) == null) db.travellerDao().insert(TravellerEntity(name = t.name.trim())) }
         s.categories.forEach { c -> if (c.name.isNotBlank() && db.expenseDao().findCategory(c.name) == null) db.expenseDao().insertCategory(c.copy(id = 0)) }
         settings.setDefaultCurrency(s.defaultCurrency)
         settings.setTheme(enumOr(s.themeMode, ThemeMode.SYSTEM))
         SettingsRepository.decodeRates(s.exchangeRates.joinToString(";")).forEach { settings.setExchangeRate(it.from, it.to, it.rate) }
+        s.holidayPrefs?.let { p ->
+            val current = settings.holidayPrefs.first()
+            settings.setHolidayPrefs(
+                HolidayPrefs(
+                    myName = p.myName.ifBlank { current.myName },
+                    partnerName = p.partnerName.ifBlank { current.partnerName },
+                    myWeeklyOff = SettingsRepository.decodeWeekdays(p.myWeeklyOff.joinToString(",")),
+                    partnerWeeklyOff = SettingsRepository.decodeWeekdays(p.partnerWeeklyOff.joinToString(",")),
+                    showIndianHolidays = p.showIndianHolidays,
+                ),
+            )
+        }
+        // Days off are merged: a day already marked on this device is kept, and only gains the
+        // backup's name for it if it had none.
+        var added = 0
+        db.withTransaction {
+            s.holidays.forEach { h ->
+                if (h.date.year !in HOLIDAY_YEARS) return@forEach
+                val label = h.label.trim().take(HolidayEntity.MAX_LABEL)
+                if (db.holidayDao().insertIfAbsent(h.copy(label = label)) != -1L) added++
+                else if (label.isNotEmpty()) db.holidayDao().fillBlankLabel(h.owner, h.date, label)
+            }
+        }
+        return added
     }
 
     // =========================================================================================
@@ -583,6 +624,8 @@ class BackupManager(
         const val MAX_ENTRIES = 50_000
         val ALLOWED_EXTENSIONS = setOf("json", "jpg", "jpeg", "png", "webp", "heic", "heif", "gif", "pdf", "bin")
         private const val STAGING_PREFIX = ".staging-"
+        /** Guards the calendar against nonsense dates in a hand-edited backup. */
+        private val HOLIDAY_YEARS = 1970..2200
         private val DOCUMENT_EXTENSION = Regex("[a-z0-9]{1,8}")
         private val SAFE_UUID = Regex("^[A-Za-z0-9_-]{1,64}$")
         private val SAFE_ARCHIVE_PATH = Regex("^(images/[A-Za-z0-9_-]+|documents)/[A-Za-z0-9._-]+$")

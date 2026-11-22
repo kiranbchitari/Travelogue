@@ -67,7 +67,8 @@ object BackupController {
     fun exportAll(c: AppContainer, uri: Uri) = c.appScope.launch {
         run("Creating backup") {
             val r = c.backup.exportAll(uri) { f, m -> _state.value = BackupUiState.Working("Creating backup", f, m) }
-            BackupUiState.Done("Backup created", "${if (r.trips == 1) "1 trip" else "${r.trips} trips"} and ${if (r.files == 1) "1 file" else "${r.files} files"} (${Fmt.bytes(r.bytes)}) saved.")
+            val holidays = if (r.holidays > 0) ", ${daysOff(r.holidays)}" else ""
+            BackupUiState.Done("Backup created", "${if (r.trips == 1) "1 trip" else "${r.trips} trips"}$holidays and ${if (r.files == 1) "1 file" else "${r.files} files"} (${Fmt.bytes(r.bytes)}) saved.")
         }
     }
 
@@ -84,6 +85,7 @@ object BackupController {
             val parts = buildList {
                 add(if (r.imported == 1) "1 trip restored." else "${r.imported} trips restored.")
                 if (r.skipped > 0) add("${r.skipped} already on this device were skipped.")
+                if (r.holidays > 0) add("${daysOff(r.holidays)} added to the holiday planner.")
                 if (r.warnings.isNotEmpty()) add("\n" + r.warnings.take(6).joinToString("\n"))
             }
             BackupUiState.Done("Import complete", parts.joinToString(" "))
@@ -94,6 +96,8 @@ object BackupController {
         c.backup.discard(session)
         _state.value = BackupUiState.Idle
     }
+
+    private fun daysOff(n: Int) = if (n == 1) "1 day off" else "$n days off"
 
     private suspend fun run(title: String, block: suspend () -> BackupUiState) {
         _state.value = BackupUiState.Working(title, 0f, "Starting…")
@@ -210,7 +214,8 @@ private fun ImportPreviewDialog(session: BackupManager.ImportSession, onImport: 
         text = {
             Column(Modifier.heightIn(max = 380.dp).verticalScroll(rememberScrollState())) {
                 Text(
-                    "${p.trips.size} trip(s) · ${p.totalFiles} files · ${Fmt.bytes(p.totalBytes)}",
+                    "${p.trips.size} trip(s) · ${p.totalFiles} files · ${Fmt.bytes(p.totalBytes)}" +
+                        if (p.holidays > 0) " · ${p.holidays} holiday planner day(s)" else "",
                     style = Travel.type.bodySmall, color = Travel.colors.inkFaint,
                 )
                 Spacer(Modifier.height(Space.md))

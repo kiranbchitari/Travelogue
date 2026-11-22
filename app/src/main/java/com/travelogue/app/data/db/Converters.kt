@@ -42,6 +42,8 @@ class Converters {
     @TypeConverter fun toPhotoOwner(v: String): PhotoOwner = enumOr(v, PhotoOwner.GENERAL)
     @TypeConverter fun documentOwner(v: DocumentOwner): String = v.name
     @TypeConverter fun toDocumentOwner(v: String): DocumentOwner = enumOr(v, DocumentOwner.TRIP)
+    @TypeConverter fun holidayOwner(v: HolidayOwner): String = v.name
+    @TypeConverter fun toHolidayOwner(v: String): HolidayOwner = enumOr(v, HolidayOwner.ME)
 }
 
 inline fun <reified T : Enum<T>> enumOr(name: String?, fallback: T): T =

@@ -10,7 +10,8 @@ import kotlinx.serialization.Serializable
 @Serializable data object SettingsRoute
 
 // Trips
-@Serializable data class TripEditorRoute(val tripId: Long = 0)
+/** [startDay]/[endDay] are epoch days that prefill a new trip's dates (0 = not set). */
+@Serializable data class TripEditorRoute(val tripId: Long = 0, val startDay: Long = 0, val endDay: Long = 0)
 @Serializable data class TripDetailRoute(val tripId: Long, val tab: Int = 0)
 @Serializable data class TripFinanceRoute(val tripId: Long)
 @Serializable data class TripTimelineRoute(val tripId: Long)
@@ -30,6 +31,9 @@ import kotlinx.serialization.Serializable
 
 /** tripId = 0 shows photos from all trips. */
 @Serializable data class PhotoViewerRoute(val tripId: Long, val photoId: Long, val favouritesOnly: Boolean = false)
+
+/** Calendar of the user's and their partner's days off. */
+@Serializable data object HolidayPlannerRoute
 
 // Settings
 @Serializable data object ManageCategoriesRoute

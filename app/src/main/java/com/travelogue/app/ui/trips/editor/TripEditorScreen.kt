@@ -26,11 +26,12 @@ import com.travelogue.app.data.db.entity.TravelType
 import com.travelogue.app.data.db.entity.TripStatus
 import com.travelogue.app.ui.common.appViewModel
 import com.travelogue.app.ui.navigation.Nav
+import java.time.LocalDate
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-fun TripEditorScreen(nav: Nav, tripId: Long) {
-    val vm = appViewModel(key = "trip-editor-$tripId") { TripEditorViewModel(this, tripId) }
+fun TripEditorScreen(nav: Nav, tripId: Long, presetStart: LocalDate? = null, presetEnd: LocalDate? = null) {
+    val vm = appViewModel(key = "trip-editor-$tripId") { TripEditorViewModel(this, tripId, presetStart, presetEnd) }
     val suggestions by vm.travellerSuggestions.collectAsStateWithLifecycle()
     val context = LocalContext.current
     val e = vm.errors

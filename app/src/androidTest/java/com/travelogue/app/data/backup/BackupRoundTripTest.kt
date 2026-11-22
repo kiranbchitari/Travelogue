@@ -4,7 +4,9 @@ import android.net.Uri
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import com.travelogue.app.TravelogueApp
+import com.travelogue.app.data.db.entity.HolidayOwner
 import com.travelogue.app.data.db.entity.TripEntity
+import com.travelogue.app.domain.HolidayPrefs
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import org.junit.After
@@ -16,6 +18,8 @@ import org.junit.Assert.fail
 import org.junit.Test
 import org.junit.runner.RunWith
 import java.io.File
+import java.time.DayOfWeek
+import java.time.LocalDate
 import java.util.zip.ZipEntry
 import java.util.zip.ZipFile
 import java.util.zip.ZipOutputStream
@@ -102,6 +106,43 @@ class BackupRoundTripTest {
         assertEquals(BackupType.FULL, session.preview.type)
         assertEquals(r.trips, session.preview.duplicates.size)
         c.backup.discard(session)
+    }
+
+    @Test fun holidayPlannerSurvivesFullBackup() = runBlocking {
+        val day = LocalDate.of(2031, 3, 14)
+        val everyone = HolidayOwner.entries.toSet()
+        val prefsBefore = c.settings.holidayPrefs.first()
+        try {
+            c.holidays.setDays(day, day.plusDays(2), everyone, emptySet(), "Spring break")
+            c.holidays.setDays(day.plusDays(10), day.plusDays(10), setOf(HolidayOwner.PARTNER), emptySet(), "")
+            c.settings.setHolidayPrefs(HolidayPrefs("Kiran", "Asha", setOf(DayOfWeek.SUNDAY), setOf(DayOfWeek.FRIDAY, DayOfWeek.SATURDAY)))
+            val saved = db.holidayDao().getAll().filter { it.date.year == 2031 }
+            assertEquals(7, saved.size)
+
+            val zipFile = File(context.cacheDir, "holidays.zip").apply { delete() }
+            assertTrue(c.backup.exportAll(Uri.fromFile(zipFile)).holidays >= 7)
+
+            // Lose everything, keeping one day whose name the backup should fill in.
+            c.holidays.setDays(day, day.plusDays(10), emptySet(), everyone, "")
+            c.holidays.setDays(day, day, setOf(HolidayOwner.ME), emptySet(), "")
+            c.settings.setHolidayPrefs(HolidayPrefs())
+
+            val session = c.backup.inspect(Uri.fromFile(zipFile))
+            assertTrue(session.preview.holidays >= 7)
+            val result = c.backup.import(session, DuplicateStrategy.SKIP)
+            assertEquals(6, result.holidays)
+
+            val restored = db.holidayDao().getAll().filter { it.date.year == 2031 }
+            assertEquals(saved.map { Triple(it.owner, it.date, it.label) }, restored.map { Triple(it.owner, it.date, it.label) })
+            val prefs = c.settings.holidayPrefs.first()
+            assertEquals("Kiran", prefs.myName)
+            assertEquals("Asha", prefs.partnerName)
+            assertEquals(setOf(DayOfWeek.SUNDAY), prefs.myWeeklyOff)
+            assertEquals(setOf(DayOfWeek.FRIDAY, DayOfWeek.SATURDAY), prefs.partnerWeeklyOff)
+        } finally {
+            c.holidays.setDays(day, day.plusDays(10), emptySet(), everyone, "")
+            c.settings.setHolidayPrefs(prefsBefore)
+        }
     }
 
     private fun zipOf(vararg entries: Pair<String, String>): File = File(context.cacheDir, "bad-${entries.size}.zip").apply {
