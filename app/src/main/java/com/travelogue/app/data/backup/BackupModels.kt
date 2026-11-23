@@ -122,7 +122,25 @@ data class PreviewTrip(
 
 enum class DuplicateStrategy { SKIP, REPLACE, KEEP_BOTH }
 
-data class ImportResult(val imported: Int, val skipped: Int, val warnings: List<String>, val holidays: Int = 0)
+data class ImportResult(
+    val imported: Int,
+    val skipped: Int,
+    val warnings: List<String>,
+    val holidays: Int = 0,
+    /** Trips that were not restored, each with the error that stopped it. Every other trip is intact. */
+    val failed: List<FailedTrip> = emptyList(),
+    /** Why settings.json could not be fully applied; null when it was, or when there was none. */
+    val settingsError: String? = null,
+    /**
+     * When anything failed: the same archive narrowed to just what failed, ready to pass back to
+     * [BackupManager.import]. Its file is kept until it is imported or [BackupManager.discard]ed.
+     */
+    val retry: BackupManager.ImportSession? = null,
+) {
+    val isPartial: Boolean get() = failed.isNotEmpty() || settingsError != null
+}
+
+data class FailedTrip(val name: String, val reason: String)
 data class ExportResult(val trips: Int, val files: Int, val bytes: Long, val missingFiles: Int, val holidays: Int = 0)
 
 /** Progress callback: fraction 0..1 and a short human message. */

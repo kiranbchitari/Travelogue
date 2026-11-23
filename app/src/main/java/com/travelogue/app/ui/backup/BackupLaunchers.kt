@@ -27,6 +27,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material.icons.rounded.ErrorOutline
 import androidx.compose.material.icons.rounded.Inventory2
+import androidx.compose.material.icons.rounded.WarningAmber
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -49,6 +50,7 @@ import com.travelogue.app.data.backup.BackupException
 import com.travelogue.app.data.backup.BackupManager
 import com.travelogue.app.data.backup.BackupType
 import com.travelogue.app.data.backup.DuplicateStrategy
+import com.travelogue.app.data.backup.ImportResult
 import com.travelogue.app.di.AppContainer
 import com.travelogue.app.ui.common.appContainer
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -62,6 +64,8 @@ sealed interface BackupUiState {
     data class Done(val title: String, val message: String) : BackupUiState
     data class Failed(val message: String) : BackupUiState
     data class DrivePicker(val token: String, val files: List<DriveClient.DriveFile>) : BackupUiState
+    /** Some trips (or the settings) didn't restore; the rest did. [strategy] is reused for a retry. */
+    data class PartialImport(val result: ImportResult, val strategy: DuplicateStrategy) : BackupUiState
 }
 
 /** App-wide export/import runner. Work runs in the application scope so it survives navigation. */
@@ -97,17 +101,34 @@ object BackupController {
         }
     }
 
-    fun import(c: AppContainer, session: BackupManager.ImportSession, strategy: DuplicateStrategy) = c.appScope.launch {
+    fun import(c: AppContainer, session: BackupManager.ImportSession, strategy: DuplicateStrategy) {
+        // Claimed here, on the tap, not when the coroutine starts: a second tap on Import or Retry
+        // must not start another import of the same (by then deleted) archive.
+        if (_state.value is BackupUiState.Working) return
+        _state.value = BackupUiState.Working("Importing", 0f, "Starting…")
+        c.appScope.launch { runImport(c, session, strategy) }
+    }
+
+    private suspend fun runImport(c: AppContainer, session: BackupManager.ImportSession, strategy: DuplicateStrategy) {
         run("Importing") {
             val r = c.backup.import(session, strategy) { f, m -> _state.value = BackupUiState.Working("Importing", f, m) }
+            if (r.isPartial) return@run BackupUiState.PartialImport(r, strategy)
             val parts = buildList {
-                add(if (r.imported == 1) "1 trip restored." else "${r.imported} trips restored.")
+                // A retry of settings alone has no trips to count.
+                if (session.archives.isNotEmpty()) add(if (r.imported == 1) "1 trip restored." else "${r.imported} trips restored.")
+                else add("Settings restored.")
                 if (r.skipped > 0) add("${r.skipped} already on this device were skipped.")
                 if (r.holidays > 0) add("${daysOff(r.holidays)} added to the holiday planner.")
                 if (r.warnings.isNotEmpty()) add("\n" + r.warnings.take(6).joinToString("\n"))
             }
             BackupUiState.Done("Import complete", parts.joinToString(" "))
         }
+    }
+
+    /** Closes the partial-restore report, dropping the archive kept for a retry. */
+    fun closePartial(c: AppContainer, result: ImportResult) {
+        result.retry?.let(c.backup::discard)
+        _state.value = BackupUiState.Idle
     }
 
     fun cancelPreview(c: AppContainer, session: BackupManager.ImportSession) {
@@ -253,6 +274,11 @@ fun BackupHost() {
         is BackupUiState.Done -> ResultDialog(Icons.Rounded.CheckCircle, Travel.colors.success, s.title, s.message)
         is BackupUiState.Failed -> ResultDialog(Icons.Rounded.ErrorOutline, Travel.colors.danger, "Couldn't complete", s.message)
         is BackupUiState.DrivePicker -> DrivePickerDialog(s.files) { BackupController.driveRestore(c, context, s.token, it) }
+        is BackupUiState.PartialImport -> PartialImportDialog(
+            s.result,
+            onRetry = s.result.retry?.let { retry -> { BackupController.import(c, retry, s.strategy) } },
+            onClose = { BackupController.closePartial(c, s.result) },
+        )
     }
 }
 
@@ -348,6 +374,54 @@ private fun ResultDialog(icon: androidx.compose.ui.graphics.vector.ImageVector, 
         title = { Text(title, style = Travel.type.title, color = Travel.colors.ink) },
         text = { Text(message, style = Travel.type.body, color = Travel.colors.inkSoft) },
         confirmButton = { TextButton(onClick = BackupController::dismiss) { Text("OK", color = Travel.colors.accent) } },
+    )
+}
+
+@Composable
+private fun PartialImportDialog(r: ImportResult, onRetry: (() -> Unit)?, onClose: () -> Unit) {
+    AlertDialog(
+        onDismissRequest = onClose,
+        containerColor = Travel.colors.cardHigh,
+        shape = Shapes.lg,
+        icon = { IconBadge(Icons.Rounded.WarningAmber, Travel.colors.gold, size = 52.dp, iconSize = 28.dp) },
+        title = { Text("Restore not finished", style = Travel.type.title, color = Travel.colors.ink) },
+        text = {
+            Column(Modifier.heightIn(max = 380.dp).verticalScroll(rememberScrollState())) {
+                val done = buildList {
+                    add(if (r.imported == 1) "1 trip restored." else "${r.imported} trips restored.")
+                    if (r.skipped > 0) add("${r.skipped} already on this device were skipped.")
+                    if (r.holidays > 0) add(if (r.holidays == 1) "1 day off added to the holiday planner." else "${r.holidays} days off added to the holiday planner.")
+                }
+                Text(done.joinToString(" "), style = Travel.type.body, color = Travel.colors.inkSoft)
+                if (r.failed.isNotEmpty()) {
+                    Spacer(Modifier.height(Space.md))
+                    Overline(if (r.failed.size == 1) "1 trip not restored" else "${r.failed.size} trips not restored")
+                    r.failed.forEach { f ->
+                        Spacer(Modifier.height(Space.sm))
+                        Text(f.name, style = Travel.type.titleSmall, color = Travel.colors.ink)
+                        Text(f.reason, style = Travel.type.bodySmall, color = Travel.colors.danger)
+                    }
+                }
+                r.settingsError?.let {
+                    Spacer(Modifier.height(Space.md))
+                    Overline("Settings")
+                    Text("Some settings may not have been restored. $it", style = Travel.type.bodySmall, color = Travel.colors.danger)
+                }
+                if (r.warnings.isNotEmpty()) {
+                    Spacer(Modifier.height(Space.md))
+                    Text(r.warnings.take(6).joinToString("\n"), style = Travel.type.bodySmall, color = Travel.colors.inkFaint)
+                }
+                Spacer(Modifier.height(Space.md))
+                Text(
+                    "Everything listed as restored is complete. Retry tries only what failed.",
+                    style = Travel.type.bodySmall, color = Travel.colors.inkFaint,
+                )
+            }
+        },
+        confirmButton = {
+            if (onRetry != null) TextButton(onClick = onRetry) { Text("Retry failed", color = Travel.colors.accent) }
+        },
+        dismissButton = { TextButton(onClick = onClose) { Text("Close", color = Travel.colors.inkSoft) } },
     )
 }
 

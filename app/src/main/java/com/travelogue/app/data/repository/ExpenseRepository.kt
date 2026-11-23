@@ -37,14 +37,16 @@ class ExpenseRepository(private val db: AppDatabase, private val media: MediaSto
         val previous = if (expense.id != 0L) dao.get(expense.id) else null
         var receipt = previous?.receiptPath ?: expense.receiptPath
         var toDelete: String? = null
+        var imported: String? = null
         if (newReceipt != null) {
-            receipt = media.importImage(newReceipt, trip.uuid, "receipts").relativePath
+            imported = media.importImage(newReceipt, trip.uuid, "receipts").relativePath
+            receipt = imported
             toDelete = previous?.receiptPath
         } else if (removeReceipt) {
             toDelete = receipt
             receipt = null
         }
-        val id = db.withTransaction {
+        val id = media.recordOrDiscard(imported) { db.withTransaction {
             val row = expense.copy(receiptPath = receipt)
             val id = if (expense.id == 0L) dao.insert(row) else { dao.update(row); expense.id }
             dao.clearSplits(id)
@@ -52,7 +54,7 @@ class ExpenseRepository(private val db: AppDatabase, private val media: MediaSto
                 dao.insertSplits(shares.filter { it.value > 0.0 }.map { ExpenseSplitEntity(expenseId = id, travellerId = it.key, amount = it.value) })
             }
             id
-        }
+        } }
         toDelete?.let { media.delete(it) }
         return id
     }

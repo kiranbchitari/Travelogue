@@ -21,7 +21,7 @@ class DriveClient(private val accessToken: String) {
     data class DriveFile(val id: String, val name: String, val size: Long = 0, val createdTime: String = "")
 
     @Serializable
-    private data class FileList(val files: List<DriveFile> = emptyList())
+    private data class FileList(val files: List<DriveFile> = emptyList(), val nextPageToken: String? = null)
 
     @Serializable
     private data class Created(val id: String)
@@ -68,12 +68,24 @@ class DriveClient(private val accessToken: String) {
         json.decodeFromString(DriveFile.serializer(), body(put))
     }
 
-    /** Backups in the folder, newest first. */
+    /** Every backup in the folder, newest first. Drive returns them a page at a time. */
     suspend fun list(): List<DriveFile> = withContext(Dispatchers.IO) {
         val folderId = folderId(create = false) ?: return@withContext emptyList()
         val q = enc("'$folderId' in parents and trashed=false and mimeType='application/zip'")
-        val conn = open("$API/files?q=$q&orderBy=createdTime%20desc&pageSize=100&fields=files(id,name,size,createdTime)&spaces=drive", "GET")
-        json.decodeFromString(FileList.serializer(), body(conn)).files
+        val all = mutableListOf<DriveFile>()
+        var pageToken: String? = null
+        do {
+            val page = pageToken?.let { "&pageToken=${enc(it)}" }.orEmpty()
+            val conn = open(
+                "$API/files?q=$q&orderBy=createdTime%20desc&pageSize=$PAGE_SIZE" +
+                    "&fields=nextPageToken,files(id,name,size,createdTime)&spaces=drive$page",
+                "GET",
+            )
+            val result = json.decodeFromString(FileList.serializer(), body(conn))
+            all += result.files
+            pageToken = result.nextPageToken?.takeIf { it.isNotEmpty() }
+        } while (pageToken != null && all.size < MAX_LISTED)
+        all
     }
 
     /** Downloads a backup to [target], reporting progress as 0..1. */
@@ -157,5 +169,9 @@ class DriveClient(private val accessToken: String) {
         private const val FOLDER_NAME = "Travelogue Backups"
         private const val FOLDER_MIME = "application/vnd.google-apps.folder"
         private const val TIMEOUT = 60_000
+        /** Drive's largest allowed page. */
+        private const val PAGE_SIZE = 1000
+        /** Stops a runaway listing; far more backups than anyone keeps. */
+        private const val MAX_LISTED = 10_000
     }
 }
