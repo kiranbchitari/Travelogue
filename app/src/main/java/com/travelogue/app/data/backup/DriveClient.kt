@@ -13,7 +13,7 @@ import java.net.URLEncoder
 
 /**
  * Minimal Google Drive v3 REST client for backup ZIPs. Uses the `drive.file` scope, so the app only
- * ever sees files it created itself. Backups live in "App Backups/Travelogue Backups" in My Drive.
+ * ever sees files it created itself. Backups live in a "Travelogue Backups" folder in My Drive.
  */
 class DriveClient(private val accessToken: String) {
 
@@ -109,25 +109,26 @@ class DriveClient(private val accessToken: String) {
         conn.disconnect()
     }
 
-    /** Resolves (and optionally creates) "App Backups/Travelogue Backups", returning the inner folder's id. */
-    private fun folderId(create: Boolean): String? {
-        // The parent may sit anywhere in My Drive (the user can move it); the child must be inside it.
-        val parent = findFolder(PARENT_FOLDER, inside = null) ?: if (create) createFolder(PARENT_FOLDER, inside = null) else return null
-        return findFolder(FOLDER_NAME, inside = parent) ?: if (create) createFolder(FOLDER_NAME, inside = parent) else null
-    }
+    /**
+     * Resolves (and optionally creates) the "Travelogue Backups" folder, returning its id.
+     *
+     * It is looked for anywhere in My Drive, oldest first: the user may move it, and backups made by
+     * 1.1.0 and earlier sit in "App Backups/Travelogue Backups", which keeps being used. A new folder
+     * is created at the top of My Drive.
+     */
+    private fun folderId(create: Boolean): String? = findFolder() ?: if (create) createFolder() else null
 
-    private fun findFolder(name: String, inside: String?): String? {
-        val where = "mimeType='$FOLDER_MIME' and name='$name' and trashed=false" + (inside?.let { " and '$it' in parents" } ?: "")
+    private fun findFolder(): String? {
+        val where = "mimeType='$FOLDER_MIME' and name='$FOLDER_NAME' and trashed=false"
         val conn = open("$API/files?q=${enc(where)}&orderBy=createdTime&fields=files(id,name)&spaces=drive", "GET")
         return json.decodeFromString(FileList.serializer(), body(conn)).files.firstOrNull()?.id
     }
 
-    private fun createFolder(name: String, inside: String?): String {
-        val parents = inside?.let { ""","parents":["$it"]""" }.orEmpty()
+    private fun createFolder(): String {
         val conn = open("$API/files?fields=id", "POST").apply {
             setRequestProperty("Content-Type", "application/json; charset=UTF-8")
             doOutput = true
-            outputStream.use { it.write("""{"name":"$name","mimeType":"$FOLDER_MIME"$parents}""".toByteArray()) }
+            outputStream.use { it.write("""{"name":"$FOLDER_NAME","mimeType":"$FOLDER_MIME"}""".toByteArray()) }
         }
         return json.decodeFromString(Created.serializer(), body(conn)).id
     }
@@ -164,8 +165,6 @@ class DriveClient(private val accessToken: String) {
         const val SCOPE = "https://www.googleapis.com/auth/drive.file"
         private const val API = "https://www.googleapis.com/drive/v3"
         private const val UPLOAD = "https://www.googleapis.com/upload/drive/v3"
-        /** Shared top-level folder for all of the user's app backups. */
-        private const val PARENT_FOLDER = "App Backups"
         private const val FOLDER_NAME = "Travelogue Backups"
         private const val FOLDER_MIME = "application/vnd.google-apps.folder"
         private const val TIMEOUT = 60_000

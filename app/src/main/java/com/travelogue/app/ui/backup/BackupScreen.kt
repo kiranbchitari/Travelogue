@@ -260,7 +260,7 @@ private fun CountCell(icon: ImageVector, n: Int, label: String, modifier: Modifi
 private fun HistoryCard(history: BackupHistory, now: Long) {
     HistoryRow(Icons.Rounded.Cloud, "Google Drive", history.drive, now, never = "Never backed up to Drive")
     Text(
-        "Saved in App Backups › Travelogue Backups in your Google Drive. Travelogue can only see the files it created there.",
+        "Saved in a Travelogue Backups folder in your Google Drive. Travelogue can only see the files it created there.",
         style = Travel.type.bodySmall, color = Travel.colors.inkFaint, modifier = Modifier.padding(start = 50.dp),
     )
     Spacer(Modifier.height(Space.md))

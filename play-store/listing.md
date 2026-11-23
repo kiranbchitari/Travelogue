@@ -32,7 +32,7 @@ PLAN TIME OFF
 PRIVATE BY DESIGN
 • Works offline. Everything is stored on your phone
 • No account, no ads, no analytics, no tracking
-• Optional backup to your own Google Drive, into an "App Backups › Travelogue Backups" folder. Travelogue can only see the files it creates there
+• Optional backup to your own Google Drive, into a "Travelogue Backups" folder. Travelogue can only see the files it creates there
 • Export any trip, or everything, as a ZIP and restore it on another phone
 
 Privacy policy: https://kiranbchitari.github.io/Travelogue/privacy.html

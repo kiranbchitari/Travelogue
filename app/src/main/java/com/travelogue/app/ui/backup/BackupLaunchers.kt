@@ -249,7 +249,7 @@ object BackupController {
                 record(c, r, BackupDestination.DRIVE, name, total)
                 BackupUiState.Done(
                     "Saved to Google Drive",
-                    summary(r, total) + " uploaded to “App Backups › Travelogue Backups” as $name." + missingNote(r),
+                    summary(r, total) + " uploaded to “Travelogue Backups” in your Google Drive as $name." + missingNote(r),
                 )
             } finally {
                 temp.delete()
