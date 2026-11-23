@@ -13,6 +13,7 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Assert.fail
+import org.junit.Assume.assumeTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 import java.io.File
@@ -20,14 +21,45 @@ import java.util.zip.ZipEntry
 import java.util.zip.ZipFile
 import java.util.zip.ZipOutputStream
 
-/** Exports a demo trip to a ZIP, re-imports it, and checks every record and file survived. */
+/**
+ * Exports a demo trip to a ZIP, re-imports it, and checks every record and file survived.
+ *
+ * These tests run inside the real app, against its real database. Loading the sample trips starts by
+ * removing the ones already there, so a test that needs them goes through [seedSamples] or
+ * [claimSamples], which skip the test on a device that already holds sample trips instead of
+ * replacing or deleting them. Never call `c.demo` directly from a test here.
+ */
 @RunWith(AndroidJUnit4::class)
 class BackupRoundTripTest {
     private val context = InstrumentationRegistry.getInstrumentation().targetContext
     private val c = (context.applicationContext as TravelogueApp).container
     private val db = c.database
 
-    @After fun cleanup() = runBlocking { c.demo.remove() }
+    /** Set once a test has found the device free of sample trips, so the ones it loads are its own to remove. */
+    private var samplesAreOurs = false
+
+    /**
+     * Skips the test unless the device holds no sample trips and none of the travellers that loading
+     * them created: both are what [DemoDataSeeder.remove] deletes. Runs before anything is changed.
+     */
+    private suspend fun claimSamples() {
+        val trips = db.tripDao().getAll().count { it.uuid.startsWith(DemoDataSeeder.PREFIX) }
+        val travellers = c.settings.demoTravellerIds().size
+        assumeTrue(
+            "Skipped: this device already holds sample data ($trips trips, $travellers travellers) that this test would delete. " +
+                "Remove the sample trips in Settings first, or use a device without them.",
+            trips == 0 && travellers == 0,
+        )
+        samplesAreOurs = true
+    }
+
+    private suspend fun seedSamples() {
+        claimSamples()
+        c.demo.seed()
+    }
+
+    // Runs after a skipped test as well, so it must only ever remove what the test itself loaded.
+    @After fun cleanup() = runBlocking { if (samplesAreOurs) c.demo.remove() }
 
     private data class Counts(
         val expenses: Int, val splits: Int, val settlements: Int, val hotels: Int, val days: Int, val activities: Int,
@@ -44,7 +76,7 @@ class BackupRoundTripTest {
     )
 
     @Test fun exportThenImportRestoresEverything() = runBlocking {
-        c.demo.seed()
+        seedSamples()
         val original = db.tripDao().getAll().first { it.name == "Kerala Backwaters" }
         val before = counts(original)
         assertTrue(before.photos > 0 && before.expenses > 0 && before.splits > 0)
@@ -94,7 +126,7 @@ class BackupRoundTripTest {
     }
 
     @Test fun fullBackupRoundTrip() = runBlocking {
-        c.demo.seed()
+        seedSamples()
         val zipFile = File(context.cacheDir, "full.zip").apply { delete() }
         val r = c.backup.exportAll(Uri.fromFile(zipFile))
         assertTrue(r.trips >= 3)
@@ -142,7 +174,7 @@ class BackupRoundTripTest {
     }
 
     @Test fun importCutOffAfterCommitIsFinishedOnNextStart() = runBlocking {
-        c.demo.seed()
+        seedSamples()
         val trip = db.tripDao().getAll().first { it.name == "Kerala Backwaters" }
         val mediaRoot = File(context.filesDir, "media")
         val inPlace = File(mediaRoot, trip.uuid)
@@ -158,7 +190,7 @@ class BackupRoundTripTest {
     }
 
     @Test fun strayStagingFoldersAreDiscardedWithoutTouchingRealMedia() = runBlocking {
-        c.demo.seed()
+        seedSamples()
         val trip = db.tripDao().getAll().first { it.name == "Kerala Backwaters" }
         val mediaRoot = File(context.filesDir, "media")
         val inPlace = File(mediaRoot, trip.uuid)
@@ -174,6 +206,7 @@ class BackupRoundTripTest {
     }
 
     @Test fun removingSampleTripsAlsoRemovesTheTravellersTheyCreated() = runBlocking {
+        claimSamples()
         c.demo.remove()
         val mine = c.trips.addTraveller("Zed Keeper")!!
         val before = db.travellerDao().getAll().map { it.id }.toSet()
