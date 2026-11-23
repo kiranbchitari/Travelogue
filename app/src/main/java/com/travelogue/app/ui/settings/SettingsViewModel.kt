@@ -4,7 +4,10 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.travelogue.app.core.designsystem.theme.ThemeMode
 import com.travelogue.app.core.storage.StorageUsage
+import com.travelogue.app.data.backup.BackupStatus
+import com.travelogue.app.data.backup.backupStatus
 import com.travelogue.app.data.settings.AppSettings
+import com.travelogue.app.ui.backup.minuteClock
 import com.travelogue.app.di.AppContainer
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
@@ -20,6 +23,11 @@ class SettingsViewModel(private val c: AppContainer) : ViewModel() {
 
     val hasDemo: StateFlow<Boolean> = c.trips.observeTrips().map { list -> list.any { it.uuid.startsWith(DEMO_PREFIX) } }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
+
+    /** Backup health plus the current time, for "Last backup 2 hours ago". */
+    val backup: StateFlow<Pair<BackupStatus, Long>?> =
+        combine(c.settings.backupHistory, c.backup.observeContents(), minuteClock()) { h, n, now -> backupStatus(h, n, now) to now }
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
 
     private val _busy = MutableStateFlow<String?>(null)
     val busy: StateFlow<String?> = _busy

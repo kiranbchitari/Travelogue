@@ -39,6 +39,7 @@ import kotlinx.serialization.Serializable
 @Serializable data object ManageCategoriesRoute
 @Serializable data object ManageTravellersRoute
 @Serializable data object ExchangeRatesRoute
+@Serializable data object BackupRoute
 
 /** Tab indices of the trip detail screen. */
 object TripTab {

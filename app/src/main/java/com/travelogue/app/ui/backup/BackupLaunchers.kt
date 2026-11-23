@@ -8,6 +8,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.material.icons.rounded.Restore
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalView
 import com.google.android.gms.auth.api.identity.AuthorizationRequest
 import com.google.android.gms.auth.api.identity.Identity
 import com.google.android.gms.common.api.Scope
@@ -47,7 +48,11 @@ import com.travelogue.app.core.designsystem.theme.Space
 import com.travelogue.app.core.designsystem.theme.Travel
 import com.travelogue.app.core.util.Fmt
 import com.travelogue.app.data.backup.BackupException
+import com.travelogue.app.data.backup.BackupDestination
 import com.travelogue.app.data.backup.BackupManager
+import com.travelogue.app.data.backup.BackupRecord
+import com.travelogue.app.data.backup.ContentCounts
+import com.travelogue.app.data.backup.ExportResult
 import com.travelogue.app.data.backup.BackupType
 import com.travelogue.app.data.backup.DuplicateStrategy
 import com.travelogue.app.data.backup.ImportResult
@@ -59,7 +64,18 @@ import kotlinx.coroutines.launch
 
 sealed interface BackupUiState {
     data object Idle : BackupUiState
-    data class Working(val title: String, val fraction: Float, val message: String) : BackupUiState
+    /**
+     * Work in progress. [step] names the stage of a multi-step job ("Step 1 of 2 · Packing your
+     * data"). [canHide] lets the user close the dialog while it carries on; only for work that
+     * reads the user's data (exports, backups), never for imports, which rewrite it.
+     */
+    data class Working(
+        val title: String,
+        val fraction: Float,
+        val message: String,
+        val step: String? = null,
+        val canHide: Boolean = false,
+    ) : BackupUiState
     data class Preview(val session: BackupManager.ImportSession) : BackupUiState
     data class Done(val title: String, val message: String) : BackupUiState
     data class Failed(val message: String) : BackupUiState
@@ -73,24 +89,35 @@ object BackupController {
     private val _state = MutableStateFlow<BackupUiState>(BackupUiState.Idle)
     val state: StateFlow<BackupUiState> = _state
 
+    private val _hidden = MutableStateFlow(false)
+    /** True while the user has hidden the progress dialog of a hideable job; reset when it ends. */
+    val hidden: StateFlow<Boolean> = _hidden
+
+    /** Hides the progress dialog; the work continues and the backup screen keeps showing it. */
+    fun hide() {
+        if ((_state.value as? BackupUiState.Working)?.canHide == true) _hidden.value = true
+    }
+
     fun dismiss() {
         (state.value as? BackupUiState.Preview)?.let { /* session discarded by caller */ }
         _state.value = BackupUiState.Idle
     }
 
     fun exportTrip(c: AppContainer, tripId: Long, uri: Uri) = c.appScope.launch {
-        run("Exporting trip") {
-            val r = c.backup.exportTrip(tripId, uri) { f, m -> _state.value = BackupUiState.Working("Exporting trip", f, m) }
+        run("Exporting trip", canHide = true) {
+            val r = c.backup.exportTrip(tripId, uri) { f, m -> _state.value = BackupUiState.Working("Exporting trip", f, m, canHide = true) }
             val extra = if (r.missingFiles > 0) "\n${r.missingFiles} missing file(s) were skipped." else ""
             BackupUiState.Done("Trip exported", "Saved the trip with ${if (r.files == 1) "1 file" else "${r.files} files"} (${Fmt.bytes(r.bytes)}).$extra")
         }
     }
 
     fun exportAll(c: AppContainer, uri: Uri) = c.appScope.launch {
-        run("Creating backup") {
-            val r = c.backup.exportAll(uri) { f, m -> _state.value = BackupUiState.Working("Creating backup", f, m) }
-            val holidays = if (r.holidays > 0) ", ${daysOff(r.holidays)}" else ""
-            BackupUiState.Done("Backup created", "${if (r.trips == 1) "1 trip" else "${r.trips} trips"}$holidays and ${if (r.files == 1) "1 file" else "${r.files} files"} (${Fmt.bytes(r.bytes)}) saved.")
+        run("Saving backup", canHide = true) {
+            val r = c.backup.exportAll(uri) { f, m -> _state.value = BackupUiState.Working("Saving backup", f, m, canHide = true) }
+            val name = c.media.displayName(uri) ?: BackupManager.backupFileName()
+            val size = c.media.sizeOf(uri).takeIf { it > 0 } ?: r.bytes
+            record(c, r, BackupDestination.FILE, name, size)
+            BackupUiState.Done("Backup saved", summary(r, size) + " saved as $name." + missingNote(r))
         }
     }
 
@@ -105,9 +132,31 @@ object BackupController {
         // Claimed here, on the tap, not when the coroutine starts: a second tap on Import or Retry
         // must not start another import of the same (by then deleted) archive.
         if (_state.value is BackupUiState.Working) return
+        _hidden.value = false
         _state.value = BackupUiState.Working("Importing", 0f, "Starting…")
         c.appScope.launch { runImport(c, session, strategy) }
     }
+
+    /** Remembers a finished full backup for the backup screen. Never fails the backup itself. */
+    private suspend fun record(c: AppContainer, r: ExportResult, destination: String, fileName: String, bytes: Long) {
+        runCatching {
+            c.settings.recordBackup(
+                BackupRecord(
+                    at = System.currentTimeMillis(), destination = destination, fileName = fileName, bytes = bytes,
+                    contents = r.contents ?: ContentCounts(trips = r.trips, holidays = r.holidays),
+                    files = r.files, missingFiles = r.missingFiles,
+                ),
+            )
+        }
+    }
+
+    private fun summary(r: ExportResult, bytes: Long): String {
+        val holidays = if (r.holidays > 0) ", ${daysOff(r.holidays)}" else ""
+        return "${if (r.trips == 1) "1 trip" else "${r.trips} trips"}$holidays and ${if (r.files == 1) "1 photo or document" else "${r.files} photos and documents"} (${Fmt.bytes(bytes)})"
+    }
+
+    private fun missingNote(r: ExportResult): String =
+        if (r.missingFiles > 0) "\n${r.missingFiles} file(s) were already missing from this phone and are not in the backup." else ""
 
     private suspend fun runImport(c: AppContainer, session: BackupManager.ImportSession, strategy: DuplicateStrategy) {
         run("Importing") {
@@ -143,19 +192,25 @@ object BackupController {
 
     /** Writes a full backup to app cache, then uploads it to the "Travelogue Backups" Drive folder. */
     fun driveBackup(c: AppContainer, context: Context, token: String) = c.appScope.launch {
-        run("Backing up to Drive") {
+        val title = "Backing up to Drive"
+        run(title, canHide = true) {
             val name = BackupManager.backupFileName().removeSuffix(".zip") + "_" + LocalTime.now().format(DateTimeFormatter.ofPattern("HHmm")) + ".zip"
             val temp = File(context.cacheDir, "drive-${UUID.randomUUID()}.zip")
             try {
-                val r = c.backup.exportAll(Uri.fromFile(temp)) { f, m -> _state.value = BackupUiState.Working("Backing up to Drive", f * 0.4f, m) }
-                DriveClient(token).upload(temp, name) { f ->
-                    _state.value = BackupUiState.Working("Backing up to Drive", 0.4f + f * 0.6f, "Uploading ${Fmt.bytes(temp.length())}")
+                val r = c.backup.exportAll(Uri.fromFile(temp)) { f, m ->
+                    _state.value = BackupUiState.Working(title, f * 0.4f, m, step = "Step 1 of 2 · Packing your data", canHide = true)
                 }
-                val holidays = if (r.holidays > 0) ", ${daysOff(r.holidays)}" else ""
+                val total = temp.length()
+                DriveClient(token).upload(temp, name) { f ->
+                    _state.value = BackupUiState.Working(
+                        title, 0.4f + f * 0.6f, "${Fmt.bytes((f * total).toLong())} of ${Fmt.bytes(total)}",
+                        step = "Step 2 of 2 · Uploading to Google Drive", canHide = true,
+                    )
+                }
+                record(c, r, BackupDestination.DRIVE, name, total)
                 BackupUiState.Done(
                     "Saved to Google Drive",
-                    "${if (r.trips == 1) "1 trip" else "${r.trips} trips"}$holidays and ${if (r.files == 1) "1 file" else "${r.files} files"} " +
-                        "(${Fmt.bytes(temp.length())}) uploaded to “App Backups › Travelogue Backups” as $name.",
+                    summary(r, total) + " uploaded to “App Backups › Travelogue Backups” as $name." + missingNote(r),
                 )
             } finally {
                 temp.delete()
@@ -191,8 +246,9 @@ object BackupController {
 
     private fun daysOff(n: Int) = if (n == 1) "1 day off" else "$n days off"
 
-    private suspend fun run(title: String, block: suspend () -> BackupUiState) {
-        _state.value = BackupUiState.Working(title, 0f, "Starting…")
+    private suspend fun run(title: String, canHide: Boolean = false, block: suspend () -> BackupUiState) {
+        _hidden.value = false
+        _state.value = BackupUiState.Working(title, 0f, "Starting…", canHide = canHide)
         _state.value = try {
             block()
         } catch (e: BackupException) {
@@ -200,6 +256,7 @@ object BackupController {
         } catch (e: Exception) {
             BackupUiState.Failed(e.message ?: "Something went wrong.")
         }
+        _hidden.value = false
     }
 }
 
@@ -249,22 +306,26 @@ fun BackupHost() {
     val c = appContainer()
     val context = LocalContext.current
     val state by BackupController.state.collectAsStateWithLifecycle()
+    val hidden by BackupController.hidden.collectAsStateWithLifecycle()
+    // A big backup can take minutes; the phone sleeping part-way would pause it.
+    val view = LocalView.current
+    val working = state is BackupUiState.Working
+    DisposableEffect(working) {
+        view.keepScreenOn = working
+        onDispose { view.keepScreenOn = false }
+    }
     when (val s = state) {
         BackupUiState.Idle -> Unit
-        is BackupUiState.Working -> AlertDialog(
+        is BackupUiState.Working -> if (!(hidden && s.canHide)) AlertDialog(
             onDismissRequest = {},
             properties = DialogProperties(dismissOnBackPress = false, dismissOnClickOutside = false),
             containerColor = Travel.colors.cardHigh,
             shape = Shapes.lg,
             title = { Text(s.title, style = Travel.type.title, color = Travel.colors.ink) },
-            text = {
-                Column {
-                    ProgressBar(s.fraction)
-                    Spacer(Modifier.height(Space.md))
-                    Text(s.message, style = Travel.type.body, color = Travel.colors.inkSoft)
-                }
+            text = { BackupProgress(s) },
+            confirmButton = {
+                if (s.canHide) TextButton(onClick = BackupController::hide) { Text("Hide", color = Travel.colors.accent) }
             },
-            confirmButton = {},
         )
         is BackupUiState.Preview -> ImportPreviewDialog(
             s.session,
@@ -279,6 +340,31 @@ fun BackupHost() {
             onRetry = s.result.retry?.let { retry -> { BackupController.import(c, retry, s.strategy) } },
             onClose = { BackupController.closePartial(c, s.result) },
         )
+    }
+}
+
+/** Step, bar, percentage and detail line of a running job. Used by the dialog and the backup screen. */
+@Composable
+fun BackupProgress(s: BackupUiState.Working, modifier: Modifier = Modifier) {
+    Column(modifier) {
+        s.step?.let {
+            Overline(it, color = Travel.colors.inkSoft)
+            Spacer(Modifier.height(Space.sm))
+        }
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            ProgressBar(s.fraction, Modifier.weight(1f))
+            Spacer(Modifier.width(Space.md))
+            Text("${(s.fraction.coerceIn(0f, 1f) * 100).toInt()}%", style = Travel.type.label, color = Travel.colors.ink)
+        }
+        Spacer(Modifier.height(Space.md))
+        Text(s.message, style = Travel.type.body, color = Travel.colors.inkSoft)
+        if (s.canHide) {
+            Spacer(Modifier.height(Space.sm))
+            Text(
+                "You can keep using the app while this runs. Keep Travelogue open until it finishes.",
+                style = Travel.type.bodySmall, color = Travel.colors.inkFaint,
+            )
+        }
     }
 }
 

@@ -155,6 +155,9 @@ class MediaStorage(private val context: Context) {
         }
     }
 
+    /** The size the provider reports for [uri], or 0 when it does not say. */
+    fun sizeOf(uri: Uri): Long = estimateSize(uri)
+
     private fun estimateSize(uri: Uri): Long = runCatching {
         context.contentResolver.query(uri, arrayOf(OpenableColumns.SIZE), null, null, null)?.use { c ->
             if (c.moveToFirst() && !c.isNull(0)) c.getLong(0) else 0L

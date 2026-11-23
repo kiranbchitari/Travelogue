@@ -35,6 +35,7 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun diaryDao(): DiaryDao
     abstract fun photoDao(): PhotoDao
     abstract fun holidayDao(): HolidayDao
+    abstract fun backupStatsDao(): BackupStatsDao
 
     companion object {
         const val NAME = "travelogue.db"

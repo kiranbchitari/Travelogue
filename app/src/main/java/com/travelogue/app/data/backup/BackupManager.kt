@@ -15,6 +15,7 @@ import com.travelogue.app.data.repository.ExpenseRepository
 import com.travelogue.app.data.settings.SettingsRepository
 import com.travelogue.app.domain.HolidayPrefs
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
@@ -67,13 +68,20 @@ class BackupManager(
     suspend fun exportAll(target: Uri, progress: Progress = { _, _ -> }): ExportResult = withContext(Dispatchers.IO) {
         // Every database read happens in one transaction, so the backup is a single consistent snapshot
         // even if the user edits or deletes something while it runs. It is only reads, so it is quick.
-        class Snapshot(val bundles: List<Bundle>, val holidays: List<HolidayEntity>, val travellers: List<TravellerEntity>, val categories: List<ExpenseCategoryEntity>)
+        class Snapshot(
+            val bundles: List<Bundle>,
+            val holidays: List<HolidayEntity>,
+            val travellers: List<TravellerEntity>,
+            val categories: List<ExpenseCategoryEntity>,
+            val counts: ContentCounts,
+        )
         val snap = db.withTransaction {
             Snapshot(
                 bundles = db.tripDao().getAll().mapNotNull { collect(it.id) },
                 holidays = db.holidayDao().getAll(),
                 travellers = db.travellerDao().getAll(),
                 categories = db.expenseDao().getCategories(),
+                counts = db.backupStatsDao().counts(),
             )
         }
         val bundles = snap.bundles
@@ -95,8 +103,11 @@ class BackupManager(
                 showIndianHolidays = holidayPrefs.showIndianHolidays,
             ),
         )
-        writeArchive(target, BackupType.FULL, bundles, settingsArchive, progress).copy(holidays = holidays.size)
+        writeArchive(target, BackupType.FULL, bundles, settingsArchive, progress).copy(holidays = holidays.size, contents = snap.counts)
     }
+
+    /** Live totals of everything a full backup would contain. */
+    fun observeContents(): Flow<ContentCounts> = db.backupStatsDao().observeCounts()
 
     /** A trip archive plus the on-disk files it references (archive path -> file). */
     private class Bundle(val archive: TripArchive, val files: Map<String, File>)
@@ -164,7 +175,7 @@ class BackupManager(
             ?: throw BackupException("Could not open the chosen location for writing.")
         try {
             ZipOutputStream(out.buffered()).use { zip ->
-                progress(0f, "Writing trip data")
+                progress(0f, "Writing your trips and settings")
                 zip.setLevel(Deflater.DEFAULT_COMPRESSION)
                 settingsArchive?.let { zip.putText("settings.json", BackupJson.encodeToString(SettingsArchive.serializer(), it)) }
                 bundles.forEach { b -> zip.putText(prefixOf(b) + "trip.json", BackupJson.encodeToString(TripArchive.serializer(), b.archive)) }
@@ -187,7 +198,10 @@ class BackupManager(
                         written += n
                         added += ManifestFile(path, n)
                     }
-                    progress(written.toFloat() / totalBytes, "Adding files ${i + 1} of ${existing.size}")
+                    progress(
+                        written.toFloat() / totalBytes,
+                        "Adding photos and documents: ${i + 1} of ${existing.size} · ${Fmt.bytes(written)} of ${Fmt.bytes(totalBytes)}",
+                    )
                 }
                 // Written last so it lists exactly the files that made it in.
                 zip.setLevel(Deflater.DEFAULT_COMPRESSION)

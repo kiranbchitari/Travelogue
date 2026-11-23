@@ -1,9 +1,12 @@
 package com.travelogue.app.core.util
 
 import java.text.NumberFormat
+import java.time.Instant
 import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.LocalTime
+import java.time.ZoneId
+import java.time.temporal.ChronoUnit
 import java.time.format.DateTimeFormatter
 import java.util.Currency
 import java.util.Locale
@@ -74,6 +77,31 @@ object Fmt {
 
     fun days(n: Int): String = if (n == 1) "1 day" else "$n days"
     fun nights(n: Int): String = if (n == 1) "1 night" else "$n nights"
+
+    /** "23 Nov 2026 · 2:05 PM" for an epoch-millisecond timestamp, in the phone's time zone. */
+    fun dateTime(epochMillis: Long, zone: ZoneId = ZoneId.systemDefault()): String =
+        dateTime(LocalDateTime.ofInstant(Instant.ofEpochMilli(epochMillis), zone))
+
+    /**
+     * How long ago [epochMillis] was: "just now", "5 minutes ago", "3 hours ago", "yesterday",
+     * "4 days ago", and beyond a week the date itself.
+     */
+    fun ago(epochMillis: Long, now: Long = System.currentTimeMillis(), zone: ZoneId = ZoneId.systemDefault()): String {
+        val minutes = (now - epochMillis) / 60_000
+        if (minutes < 1) return "just now"
+        if (minutes < 60) return if (minutes == 1L) "1 minute ago" else "$minutes minutes ago"
+        val hours = minutes / 60
+        if (hours < 12) return if (hours == 1L) "1 hour ago" else "$hours hours ago"
+        val then = Instant.ofEpochMilli(epochMillis).atZone(zone).toLocalDate()
+        val today = Instant.ofEpochMilli(now).atZone(zone).toLocalDate()
+        val days = ChronoUnit.DAYS.between(then, today)
+        return when {
+            days <= 0 -> if (hours == 1L) "1 hour ago" else "$hours hours ago"
+            days == 1L -> "yesterday"
+            days < 7 -> "$days days ago"
+            else -> date(then)
+        }
+    }
 
     fun bytes(b: Long): String = when {
         b >= 1L shl 30 -> String.format(Locale.getDefault(), "%.2f GB", b / (1L shl 30).toDouble())

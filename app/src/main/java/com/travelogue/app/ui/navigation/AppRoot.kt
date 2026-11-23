@@ -48,6 +48,7 @@ import com.travelogue.app.core.designsystem.theme.Shapes
 import com.travelogue.app.core.designsystem.theme.Space
 import com.travelogue.app.core.designsystem.theme.Travel
 import com.travelogue.app.ui.backup.BackupHost
+import com.travelogue.app.ui.backup.BackupScreen
 import com.travelogue.app.ui.bookings.BookingEditorScreen
 import com.travelogue.app.ui.contacts.ContactEditorScreen
 import com.travelogue.app.ui.diary.DiaryDetailScreen
@@ -137,6 +138,7 @@ fun AppRoot() {
             composable<ManageCategoriesRoute> { ManageCategoriesScreen(nav) }
             composable<ManageTravellersRoute> { ManageTravellersScreen(nav) }
             composable<ExchangeRatesRoute> { ExchangeRatesScreen(nav) }
+            composable<BackupRoute> { BackupScreen(nav) }
         }
 
         // Tab screens scroll edge-to-edge; keep the status bar legible over their content.

@@ -58,4 +58,5 @@ class Nav(val controller: NavHostController) {
     fun categories() = go(ManageCategoriesRoute)
     fun travellers() = go(ManageTravellersRoute)
     fun exchangeRates() = go(ExchangeRatesRoute)
+    fun backup() = go(BackupRoute)
 }

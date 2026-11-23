@@ -6,6 +6,9 @@ import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import com.travelogue.app.core.designsystem.theme.ThemeMode
+import com.travelogue.app.data.backup.BackupHistory
+import com.travelogue.app.data.backup.BackupJson
+import com.travelogue.app.data.backup.BackupRecord
 import com.travelogue.app.data.db.enumOr
 import com.travelogue.app.domain.ExchangeRate
 import com.travelogue.app.domain.HolidayPrefs
@@ -37,6 +40,8 @@ class SettingsRepository(private val context: Context) {
         val holidayMyWeeklyOff = stringPreferencesKey("holiday_my_weekly_off")
         val holidayPartnerWeeklyOff = stringPreferencesKey("holiday_partner_weekly_off")
         val holidayShowIndian = booleanPreferencesKey("holiday_show_indian")
+        val lastDriveBackup = stringPreferencesKey("last_drive_backup")
+        val lastFileBackup = stringPreferencesKey("last_file_backup")
     }
 
     val settings: Flow<AppSettings> = context.dataStore.data.map { p ->
@@ -82,7 +87,30 @@ class SettingsRepository(private val context: Context) {
         context.dataStore.edit { if (ids.isEmpty()) it.remove(Keys.demoTravellers) else it[Keys.demoTravellers] = ids.joinToString(",") }
     }
 
-    suspend fun clear() { context.dataStore.edit { it.clear() } }
+    /** The last full backup to Google Drive and to a ZIP file. */
+    val backupHistory: Flow<BackupHistory> = context.dataStore.data.map { p ->
+        BackupHistory(drive = decodeRecord(p[Keys.lastDriveBackup]), file = decodeRecord(p[Keys.lastFileBackup]))
+    }.distinctUntilChanged()
+
+    suspend fun recordBackup(record: BackupRecord) {
+        val key = if (record.isDrive) Keys.lastDriveBackup else Keys.lastFileBackup
+        context.dataStore.edit { it[key] = BackupJson.encodeToString(BackupRecord.serializer(), record) }
+    }
+
+    /**
+     * Forgets every preference. The backup history is kept: the backups themselves still exist in
+     * Drive or on the phone, and knowing about them matters most right after the data is cleared.
+     */
+    suspend fun clear() {
+        context.dataStore.edit { p ->
+            val kept = listOf(Keys.lastDriveBackup, Keys.lastFileBackup).mapNotNull { k -> p[k]?.let { v -> Pair(k, v) } }
+            p.clear()
+            kept.forEach { (k, v) -> p[k] = v }
+        }
+    }
+
+    private fun decodeRecord(raw: String?): BackupRecord? =
+        raw?.let { runCatching { BackupJson.decodeFromString(BackupRecord.serializer(), it) }.getOrNull() }
 
     /** Sets (or with a null/zero rate, removes) 1 [from] = [rate] [to]. Any inverse pair is replaced. */
     suspend fun setExchangeRate(from: String, to: String, rate: Double?) {

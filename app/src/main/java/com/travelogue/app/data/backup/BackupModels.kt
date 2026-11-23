@@ -141,7 +141,15 @@ data class ImportResult(
 }
 
 data class FailedTrip(val name: String, val reason: String)
-data class ExportResult(val trips: Int, val files: Int, val bytes: Long, val missingFiles: Int, val holidays: Int = 0)
+data class ExportResult(
+    val trips: Int,
+    val files: Int,
+    val bytes: Long,
+    val missingFiles: Int,
+    val holidays: Int = 0,
+    /** Every kind of record in a full backup, counted in the same snapshot it was written from. */
+    val contents: ContentCounts? = null,
+)
 
 /** Progress callback: fraction 0..1 and a short human message. */
 typealias Progress = (fraction: Float, message: String) -> Unit

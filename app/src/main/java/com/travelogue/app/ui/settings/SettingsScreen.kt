@@ -30,9 +30,10 @@ import com.travelogue.app.core.designsystem.theme.Travel
 import com.travelogue.app.core.storage.StorageUsage
 import com.travelogue.app.core.util.CommonCurrencies
 import com.travelogue.app.core.util.Fmt
-import com.travelogue.app.ui.backup.rememberBackupImporter
-import com.travelogue.app.ui.backup.rememberDriveActions
-import com.travelogue.app.ui.backup.rememberFullBackupExporter
+import com.travelogue.app.data.backup.BackupHealth
+import com.travelogue.app.data.backup.BackupStatus
+import com.travelogue.app.ui.backup.destinationName
+import com.travelogue.app.ui.backup.healthLook
 import com.travelogue.app.ui.common.appViewModel
 import com.travelogue.app.ui.common.tabContentPadding
 import com.travelogue.app.ui.navigation.Nav
@@ -46,9 +47,7 @@ fun SettingsScreen(nav: Nav) {
     val hasDemo by vm.hasDemo.collectAsStateWithLifecycle()
     val busy by vm.busy.collectAsStateWithLifecycle()
     val context = LocalContext.current
-    val exportAll = rememberFullBackupExporter()
-    val importBackup = rememberBackupImporter()
-    val drive = rememberDriveActions()
+    val backup by vm.backup.collectAsStateWithLifecycle()
     var confirmClear by remember { mutableStateOf(false) }
     var confirmDemoRemove by remember { mutableStateOf(false) }
 
@@ -99,15 +98,7 @@ fun SettingsScreen(nav: Nav) {
 
         item {
             SettingsGroup("Backup & restore") {
-                Text(
-                    "Everything lives on this phone. Back up to Google Drive or export a ZIP regularly — any trip can also be exported on its own from the trip's menu.",
-                    style = Travel.type.body, color = Travel.colors.inkSoft,
-                )
-                Spacer(Modifier.height(Space.md))
-                ActionRow(Icons.Rounded.CloudUpload, "Back up to Google Drive", "Upload a full backup to your Drive", Travel.colors.secondary, drive.backup)
-                ActionRow(Icons.Rounded.CloudSync, "Restore from Google Drive", "Pick a backup saved in your Drive", Travel.colors.secondary, drive.restore)
-                ActionRow(Icons.Rounded.CloudDownload, "Export all data", "Save a complete ZIP backup", Travel.colors.secondary, exportAll)
-                ActionRow(Icons.Rounded.Restore, "Import backup or trip", "Restore from a Travelogue ZIP", Travel.colors.secondary, importBackup)
+                BackupStatusRow(backup, nav::backup)
             }
         }
 
@@ -177,6 +168,33 @@ private fun NavRow(icon: ImageVector, title: String, subtitle: String, onClick: 
         Column(Modifier.weight(1f)) {
             Text(title, style = Travel.type.titleSmall, color = Travel.colors.ink)
             Text(subtitle, style = Travel.type.bodySmall, color = Travel.colors.inkFaint)
+        }
+        Icon(Icons.AutoMirrored.Rounded.KeyboardArrowRight, null, tint = Travel.colors.inkFaint)
+    }
+}
+
+/** Whether the data is safe right now, at a glance; opens the backup screen. */
+@Composable
+private fun BackupStatusRow(backup: Pair<BackupStatus, Long>?, onClick: () -> Unit) {
+    val status = backup?.first
+    val look = status?.let { healthLook(it.health) }
+    Row(
+        Modifier.fillMaxWidth().clip(Shapes.md).clickable(onClick = onClick).padding(vertical = 6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        IconBadge(look?.icon ?: Icons.Rounded.Cloud, look?.tint ?: Travel.colors.inkFaint, size = 44.dp, iconSize = 22.dp)
+        Spacer(Modifier.width(Space.md))
+        Column(Modifier.weight(1f)) {
+            Text(look?.headline ?: "Backup & restore", style = Travel.type.titleSmall, color = Travel.colors.ink)
+            val latest = status?.latest
+            Text(
+                when {
+                    latest != null -> "Last backup ${Fmt.ago(latest.at, backup.second)} · ${destinationName(latest)}"
+                    status?.health == BackupHealth.NEVER -> "Your trips exist only on this phone"
+                    else -> "Back up to Google Drive or a ZIP file"
+                },
+                style = Travel.type.bodySmall, color = Travel.colors.inkFaint,
+            )
         }
         Icon(Icons.AutoMirrored.Rounded.KeyboardArrowRight, null, tint = Travel.colors.inkFaint)
     }
