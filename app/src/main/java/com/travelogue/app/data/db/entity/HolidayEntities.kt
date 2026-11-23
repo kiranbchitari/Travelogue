@@ -9,13 +9,14 @@ import kotlinx.serialization.UseSerializers
 import java.time.LocalDate
 
 /**
- * One day off for one person (a public holiday, a company holiday or booked leave). A day both
+ * One day off for one person (a public holiday, a company holiday or booked leave). A day two
  * people have off is two rows. Weekly days off are a setting, not rows; see HolidayPrefs.
  */
 @Entity(tableName = "holidays", primaryKeys = ["owner", "date"])
 @Serializable
 data class HolidayEntity(
-    val owner: HolidayOwner,
+    /** The person's id: [com.travelogue.app.domain.HolidayPerson.ME], PARTNER, or an added person's id. */
+    val owner: String,
     val date: LocalDate,
     /** Optional name such as "Diwali" or "Annual leave". */
     val label: String = "",

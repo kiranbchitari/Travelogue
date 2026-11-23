@@ -1,10 +1,21 @@
 package com.travelogue.app.domain
 
-import com.travelogue.app.data.db.entity.HolidayOwner
 import java.time.DayOfWeek
 import java.time.LocalDate
+import java.util.UUID
 
-/** Who the two calendars belong to and which weekdays each of them never works. */
+/** Someone whose days off the planner tracks: the phone's owner, their partner, or a person added later. */
+data class HolidayPerson(val id: String, val name: String, val weeklyOff: Set<DayOfWeek> = HolidayPrefs.Weekend) {
+    companion object {
+        /** Fixed ids of the two people the planner always has. Added people get an id from [newId]. */
+        const val ME = "ME"
+        const val PARTNER = "PARTNER"
+
+        fun newId(): String = UUID.randomUUID().toString().take(8)
+    }
+}
+
+/** Who the calendars belong to and which weekdays each of them never works. */
 data class HolidayPrefs(
     val myName: String = DEFAULT_MY_NAME,
     val partnerName: String = DEFAULT_PARTNER_NAME,
@@ -12,27 +23,37 @@ data class HolidayPrefs(
     val partnerWeeklyOff: Set<DayOfWeek> = Weekend,
     /** Show India's public holidays on the calendar and use them when suggesting leave. */
     val showIndianHolidays: Boolean = true,
+    /** Anyone added beyond the first two, in the order they were added. */
+    val extras: List<HolidayPerson> = emptyList(),
 ) {
-    fun name(owner: HolidayOwner): String = if (owner == HolidayOwner.ME) myName else partnerName
-    fun weeklyOff(owner: HolidayOwner): Set<DayOfWeek> = if (owner == HolidayOwner.ME) myWeeklyOff else partnerWeeklyOff
+    /** Everyone in the planner: me, my partner, then anyone added. */
+    val people: List<HolidayPerson> =
+        listOf(HolidayPerson(HolidayPerson.ME, myName, myWeeklyOff), HolidayPerson(HolidayPerson.PARTNER, partnerName, partnerWeeklyOff)) + extras
 
     companion object {
         const val DEFAULT_MY_NAME = "Me"
         const val DEFAULT_PARTNER_NAME = "Wife"
         const val MAX_NAME = 24
+        /** Me, my partner and up to four more: as many as a calendar day has room to show. */
+        const val MAX_PEOPLE = 6
         val Weekend: Set<DayOfWeek> = setOf(DayOfWeek.SATURDAY, DayOfWeek.SUNDAY)
     }
 }
 
-/** A run of consecutive days that both people have off. */
+/** One person's time off: the days marked for them and the weekdays they never work. */
+data class DaysOff(val marked: Set<LocalDate>, val weeklyOff: Set<DayOfWeek> = HolidayPrefs.Weekend) {
+    fun isOff(date: LocalDate): Boolean = date in marked || date.dayOfWeek in weeklyOff
+}
+
+/** A run of consecutive days that everyone has off. */
 data class SharedBreak(val start: LocalDate, val end: LocalDate, val labels: List<String> = emptyList()) {
     val days: Int get() = (end.toEpochDay() - start.toEpochDay()).toInt() + 1
     operator fun contains(date: LocalDate): Boolean = !date.isBefore(start) && !date.isAfter(end)
 }
 
 /**
- * A stretch both people could have off by taking a little leave: [leaveDays] are the working days in
- * between to book, and [holidays] are public holidays inside it that are not yet marked for both.
+ * A stretch everyone could have off by taking a little leave: [leaveDays] are the working days in
+ * between to book, and [holidays] are public holidays inside it that are not yet marked for everyone.
  */
 data class LeaveIdea(
     val start: LocalDate,
@@ -54,20 +75,18 @@ object HolidayPlanner {
     /** Shorter runs are just an ordinary weekend. */
     const val MIN_BREAK_DAYS = 3
 
-    fun isOff(date: LocalDate, marked: Set<LocalDate>, weeklyOff: Set<DayOfWeek>): Boolean =
-        date in marked || date.dayOfWeek in weeklyOff
+    /** True when every one of [people] is off on [date]. Nobody at all is never "everyone". */
+    fun allOff(date: LocalDate, people: List<DaysOff>): Boolean = people.isNotEmpty() && people.all { it.isOff(date) }
 
     /**
      * Every run of at least [minDays] consecutive days between [from] and [to] (inclusive) on which
-     * both people are off, whether through a marked holiday or a weekly day off. [labels] names the
+     * every one of [people] is off, whether through a marked holiday or a weekly day off. [labels] names the
      * marked days so a break can be shown as "Diwali" rather than only as dates.
      */
     fun sharedBreaks(
         from: LocalDate,
         to: LocalDate,
-        mine: Set<LocalDate>,
-        partner: Set<LocalDate>,
-        prefs: HolidayPrefs,
+        people: List<DaysOff>,
         labels: Map<LocalDate, String> = emptyMap(),
         minDays: Int = MIN_BREAK_DAYS,
     ): List<SharedBreak> {
@@ -85,8 +104,7 @@ object HolidayPlanner {
             out += SharedBreak(start, last, names)
         }
         while (!day.isAfter(to)) {
-            val both = isOff(day, mine, prefs.myWeeklyOff) && isOff(day, partner, prefs.partnerWeeklyOff)
-            if (both) { if (runStart == null) runStart = day } else close(day.minusDays(1))
+            if (allOff(day, people)) { if (runStart == null) runStart = day } else close(day.minusDays(1))
             day = day.plusDays(1)
         }
         close(to)
@@ -102,7 +120,7 @@ object HolidayPlanner {
     /**
      * Suggestions for turning days off into longer breaks between [from] and [to].
      *
-     * A public holiday counts as a day both could have off. Runs of such days that sit one or two
+     * A public holiday counts as a day everyone could have off. Runs of such days that sit one or two
      * working days apart are joined, and the working days become the leave to take. A suggestion
      * that needs nothing marked is already a break and is left out. The best non-overlapping
      * suggestions (most days off beyond the leave spent, longer ones first) are returned in date order.
@@ -110,20 +128,19 @@ object HolidayPlanner {
     fun leaveIdeas(
         from: LocalDate,
         to: LocalDate,
-        mine: Set<LocalDate>,
-        partner: Set<LocalDate>,
-        prefs: HolidayPrefs,
+        people: List<DaysOff>,
         publicHolidays: Map<LocalDate, PublicHoliday>,
         max: Int = 12,
     ): List<LeaveIdea> {
-        fun bothOff(d: LocalDate) = isOff(d, mine, prefs.myWeeklyOff) && isOff(d, partner, prefs.partnerWeeklyOff)
+        if (people.isEmpty()) return emptyList()
+        fun everyoneOff(d: LocalDate) = allOff(d, people)
 
-        // Runs of days both have, or with a public holiday could have, off.
+        // Runs of days everyone has, or with a public holiday could have, off.
         val runs = ArrayList<Pair<LocalDate, LocalDate>>()
         var runStart: LocalDate? = null
         var day = from
         while (!day.isAfter(to)) {
-            val free = bothOff(day) || day in publicHolidays
+            val free = everyoneOff(day) || day in publicHolidays
             if (free && runStart == null) runStart = day
             if (!free && runStart != null) { runs += runStart to day.minusDays(1); runStart = null }
             day = day.plusDays(1)
@@ -139,7 +156,7 @@ object HolidayPlanner {
                 val end = runs[j].second
                 val length = (end.toEpochDay() - start.toEpochDay()).toInt() + 1
                 val unmarked = (start.toEpochDay()..end.toEpochDay()).map(LocalDate::ofEpochDay)
-                    .filter { it !in leave && !bothOff(it) }.mapNotNull(publicHolidays::get)
+                    .filter { it !in leave && !everyoneOff(it) }.mapNotNull(publicHolidays::get)
                 if (length >= minDaysForLeave[leave.size] && (leave.isNotEmpty() || unmarked.isNotEmpty())) {
                     candidates += LeaveIdea(start, end, leave.toList(), unmarked)
                 }

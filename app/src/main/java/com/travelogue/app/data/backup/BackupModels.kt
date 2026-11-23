@@ -77,7 +77,7 @@ data class SettingsArchive(
     val categories: List<ExpenseCategoryEntity> = emptyList(),
     /** "EUR>INR=92.5" entries (Settings → Exchange rates). */
     val exchangeRates: List<String> = emptyList(),
-    /** Holiday planner: every marked day off for both people. */
+    /** Holiday planner: every marked day off, for everyone in it. */
     val holidays: List<HolidayEntity> = emptyList(),
     /** Holiday planner names and weekly days off; absent in backups made before the planner existed. */
     val holidayPrefs: HolidayPrefsArchive? = null,
@@ -91,6 +91,17 @@ data class HolidayPrefsArchive(
     val myWeeklyOff: List<Int> = listOf(6, 7),
     val partnerWeeklyOff: List<Int> = listOf(6, 7),
     val showIndianHolidays: Boolean = true,
+    /** People added beyond the first two; absent in backups made before more could be added. */
+    val extras: List<HolidayPersonArchive> = emptyList(),
+)
+
+/** An added person in the holiday planner. Also how the list of them is kept in the app's settings. */
+@Serializable
+data class HolidayPersonArchive(
+    val id: String = "",
+    val name: String = "",
+    /** ISO weekday numbers, Monday = 1. */
+    val weeklyOff: List<Int> = listOf(6, 7),
 )
 
 val BackupJson = Json {

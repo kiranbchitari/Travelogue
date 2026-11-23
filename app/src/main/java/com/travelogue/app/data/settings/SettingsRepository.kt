@@ -10,13 +10,17 @@ import com.travelogue.app.core.designsystem.theme.ThemeMode
 import com.travelogue.app.data.backup.BackupHistory
 import com.travelogue.app.data.backup.BackupJson
 import com.travelogue.app.data.backup.BackupRecord
+import com.travelogue.app.data.backup.HolidayPersonArchive
+import com.travelogue.app.data.backup.HolidayPrefsArchive
 import com.travelogue.app.data.db.enumOr
 import com.travelogue.app.domain.ExchangeRate
+import com.travelogue.app.domain.HolidayPerson
 import com.travelogue.app.domain.HolidayPrefs
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
+import kotlinx.serialization.builtins.ListSerializer
 import java.time.DayOfWeek
 
 private val Context.dataStore by preferencesDataStore(name = "settings")
@@ -44,6 +48,7 @@ class SettingsRepository(private val context: Context) {
         val holidayMyWeeklyOff = stringPreferencesKey("holiday_my_weekly_off")
         val holidayPartnerWeeklyOff = stringPreferencesKey("holiday_partner_weekly_off")
         val holidayShowIndian = booleanPreferencesKey("holiday_show_indian")
+        val holidayExtraPeople = stringPreferencesKey("holiday_extra_people")
         val lastDriveBackup = stringPreferencesKey("last_drive_backup")
         val lastFileBackup = stringPreferencesKey("last_file_backup")
     }
@@ -60,7 +65,7 @@ class SettingsRepository(private val context: Context) {
 
     suspend fun current(): AppSettings = settings.first()
 
-    /** Names and weekly days off for the two holiday calendars. */
+    /** Names and weekly days off for everyone in the holiday planner. */
     val holidayPrefs: Flow<HolidayPrefs> = context.dataStore.data.map { p ->
         HolidayPrefs(
             myName = p[Keys.holidayMyName]?.takeIf { it.isNotBlank() } ?: HolidayPrefs.DEFAULT_MY_NAME,
@@ -68,6 +73,7 @@ class SettingsRepository(private val context: Context) {
             myWeeklyOff = decodeWeekdays(p[Keys.holidayMyWeeklyOff]),
             partnerWeeklyOff = decodeWeekdays(p[Keys.holidayPartnerWeeklyOff]),
             showIndianHolidays = p[Keys.holidayShowIndian] ?: true,
+            extras = decodePeople(p[Keys.holidayExtraPeople]),
         )
     }.distinctUntilChanged()
 
@@ -78,6 +84,7 @@ class SettingsRepository(private val context: Context) {
             it[Keys.holidayMyWeeklyOff] = encodeWeekdays(prefs.myWeeklyOff)
             it[Keys.holidayPartnerWeeklyOff] = encodeWeekdays(prefs.partnerWeeklyOff)
             it[Keys.holidayShowIndian] = prefs.showIndianHolidays
+            it[Keys.holidayExtraPeople] = encodePeople(prefs.extras)
         }
     }
 
@@ -139,6 +146,56 @@ class SettingsRepository(private val context: Context) {
         /** Absent (never set) falls back to Saturday and Sunday. */
         fun decodeWeekdays(raw: String?): Set<DayOfWeek> =
             raw?.split(',')?.mapNotNull { it.trim().toIntOrNull()?.takeIf { n -> n in 1..7 }?.let(DayOfWeek::of) }?.toSet() ?: HolidayPrefs.Weekend
+
+        private val PeopleSerializer = ListSerializer(HolidayPersonArchive.serializer())
+
+        fun archive(p: HolidayPerson) = HolidayPersonArchive(p.id, p.name, p.weeklyOff.map { it.value }.sorted())
+
+        /**
+         * Tidies a list of added people wherever it came from (this app, or a backup file): ids must
+         * be usable and unique, names fit, and there are never more people than the planner can show.
+         */
+        fun toPeople(archived: List<HolidayPersonArchive>): List<HolidayPerson> = archived
+            .filter { it.id.isNotBlank() && it.id.length <= 40 && it.id != HolidayPerson.ME && it.id != HolidayPerson.PARTNER }
+            .distinctBy { it.id }
+            .take(HolidayPrefs.MAX_PEOPLE - 2)
+            .mapIndexed { i, a ->
+                HolidayPerson(a.id, a.name.trim().take(HolidayPrefs.MAX_NAME).ifBlank { "Person ${i + 3}" }, decodeWeekdays(a.weeklyOff.joinToString(",")))
+            }
+
+        fun encodePeople(people: List<HolidayPerson>): String = BackupJson.encodeToString(PeopleSerializer, toPeople(people.map(::archive)).map(::archive))
+
+        /** Absent or unreadable means nobody has been added. */
+        fun decodePeople(raw: String?): List<HolidayPerson> =
+            raw?.let { runCatching { toPeople(BackupJson.decodeFromString(PeopleSerializer, it)) }.getOrNull() }.orEmpty()
+
+        /** Everything about the planner's people and its settings, as a backup carries it. */
+        fun archive(prefs: HolidayPrefs) = HolidayPrefsArchive(
+            myName = prefs.myName,
+            partnerName = prefs.partnerName,
+            myWeeklyOff = prefs.myWeeklyOff.map { it.value }.sorted(),
+            partnerWeeklyOff = prefs.partnerWeeklyOff.map { it.value }.sorted(),
+            showIndianHolidays = prefs.showIndianHolidays,
+            extras = prefs.extras.map(::archive),
+        )
+
+        /**
+         * What the planner's settings become when a backup is restored on a device that has [current].
+         * The backup's names, weekly days off and holiday switch win. People are merged like their days
+         * off: everyone in the backup comes back as the backup had them, and anyone added on this
+         * device since then stays. An older backup that names nobody keeps the current names.
+         */
+        fun restore(backup: HolidayPrefsArchive, current: HolidayPrefs): HolidayPrefs {
+            val restored = toPeople(backup.extras)
+            return HolidayPrefs(
+                myName = backup.myName.ifBlank { current.myName },
+                partnerName = backup.partnerName.ifBlank { current.partnerName },
+                myWeeklyOff = decodeWeekdays(backup.myWeeklyOff.joinToString(",")),
+                partnerWeeklyOff = decodeWeekdays(backup.partnerWeeklyOff.joinToString(",")),
+                showIndianHolidays = backup.showIndianHolidays,
+                extras = (restored + current.extras.filter { mine -> restored.none { it.id == mine.id } }).take(HolidayPrefs.MAX_PEOPLE - 2),
+            )
+        }
 
         /** Stored as "EUR>INR=92.5;USD>INR=84". */
         fun encodeRates(rates: List<ExchangeRate>): String = rates.joinToString(";") { "${it.from}>${it.to}=${it.rate}" }

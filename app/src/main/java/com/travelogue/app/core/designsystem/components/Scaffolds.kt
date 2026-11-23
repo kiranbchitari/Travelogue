@@ -204,12 +204,16 @@ fun ConfirmDialog(
     )
 }
 
-/** Bottom sheet with app styling. */
+/**
+ * Bottom sheet with app styling. A tall sheet first opens half way up the screen; [fullHeight] opens
+ * it all the way, for forms whose Save button would otherwise start out of sight.
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun TravelSheet(onDismiss: () -> Unit, title: String? = null, content: @Composable ColumnScope.() -> Unit) {
+fun TravelSheet(onDismiss: () -> Unit, title: String? = null, fullHeight: Boolean = false, content: @Composable ColumnScope.() -> Unit) {
     ModalBottomSheet(
         onDismissRequest = onDismiss,
+        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = fullHeight),
         containerColor = Travel.colors.background,
         shape = Shapes.xl.copy(bottomStart = androidx.compose.foundation.shape.CornerSize(0.dp), bottomEnd = androidx.compose.foundation.shape.CornerSize(0.dp)),
         dragHandle = {

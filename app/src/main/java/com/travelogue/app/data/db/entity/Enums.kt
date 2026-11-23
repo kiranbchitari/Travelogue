@@ -36,6 +36,3 @@ enum class PhotoOwner(val folder: String) {
 
 /** What a [DocumentEntity] belongs to. */
 enum class DocumentOwner { BOOKING, TRIP }
-
-/** Whose day off a [HolidayEntity] is: the phone's owner or their partner. */
-enum class HolidayOwner { ME, PARTNER }

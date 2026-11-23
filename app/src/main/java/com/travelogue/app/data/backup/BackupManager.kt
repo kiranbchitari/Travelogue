@@ -14,7 +14,6 @@ import com.travelogue.app.data.db.entity.*
 import com.travelogue.app.data.db.enumOr
 import com.travelogue.app.data.repository.ExpenseRepository
 import com.travelogue.app.data.settings.SettingsRepository
-import com.travelogue.app.domain.HolidayPrefs
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
@@ -97,13 +96,7 @@ class BackupManager(
             categories = snap.categories,
             exchangeRates = s.exchangeRates.map { SettingsRepository.encodeRates(listOf(it)) },
             holidays = holidays,
-            holidayPrefs = HolidayPrefsArchive(
-                myName = holidayPrefs.myName,
-                partnerName = holidayPrefs.partnerName,
-                myWeeklyOff = holidayPrefs.myWeeklyOff.map { it.value }.sorted(),
-                partnerWeeklyOff = holidayPrefs.partnerWeeklyOff.map { it.value }.sorted(),
-                showIndianHolidays = holidayPrefs.showIndianHolidays,
-            ),
+            holidayPrefs = SettingsRepository.archive(holidayPrefs),
         )
         writeArchive(target, BackupType.FULL, bundles, settingsArchive, progress).copy(holidays = holidays.size, contents = snap.counts)
     }
@@ -680,24 +673,15 @@ class BackupManager(
         // Older backups have no look, and a newer app may name one this version lacks: keep the current one.
         AppTheme.entries.firstOrNull { it.name == s.appTheme }?.let { settings.setAppTheme(it) }
         SettingsRepository.decodeRates(s.exchangeRates.joinToString(";")).forEach { settings.setExchangeRate(it.from, it.to, it.rate) }
-        s.holidayPrefs?.let { p ->
-            val current = settings.holidayPrefs.first()
-            settings.setHolidayPrefs(
-                HolidayPrefs(
-                    myName = p.myName.ifBlank { current.myName },
-                    partnerName = p.partnerName.ifBlank { current.partnerName },
-                    myWeeklyOff = SettingsRepository.decodeWeekdays(p.myWeeklyOff.joinToString(",")),
-                    partnerWeeklyOff = SettingsRepository.decodeWeekdays(p.partnerWeeklyOff.joinToString(",")),
-                    showIndianHolidays = p.showIndianHolidays,
-                ),
-            )
-        }
+        s.holidayPrefs?.let { settings.setHolidayPrefs(SettingsRepository.restore(it, settings.holidayPrefs.first())) }
+        val people = settings.holidayPrefs.first().people.map { it.id }.toSet()
         // Days off are merged: a day already marked on this device is kept, and only gains the
         // backup's name for it if it had none.
         var added = 0
         db.withTransaction {
             s.holidays.forEach { h ->
-                if (h.date.year !in HOLIDAY_YEARS) return@forEach
+                // A day off for someone who is not in the planner would never show, so it is not restored.
+                if (h.date.year !in HOLIDAY_YEARS || h.owner !in people) return@forEach
                 val label = h.label.trim().take(HolidayEntity.MAX_LABEL)
                 if (db.holidayDao().insertIfAbsent(h.copy(label = label)) != -1L) added++
                 else if (label.isNotEmpty()) db.holidayDao().fillBlankLabel(h.owner, h.date, label)
