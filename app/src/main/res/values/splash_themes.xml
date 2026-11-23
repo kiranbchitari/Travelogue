@@ -1,0 +1,125 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  One start-up screen per theme, each in three forms: following the system's light/dark setting,
+  and fixed light or dark for when the app's brightness is set by hand. MainActivity tells Android
+  which one to use (Android 12 and later). Android remembers the choice by style name, so these
+  names must not change.
+-->
+<resources>
+    <attr name="splashMark" format="color" />
+    <attr name="splashAccent" format="color" />
+
+    <style name="Theme.Travelogue.Splash.Classic">
+        <item name="windowSplashScreenBackground">@color/splash_classic_bg</item>
+        <item name="windowSplashScreenAnimatedIcon">@drawable/ic_splash</item>
+        <item name="splashMark">@color/splash_classic_mark</item>
+        <item name="splashAccent">@color/splash_classic_accent</item>
+    </style>
+    <style name="Theme.Travelogue.Splash.Classic.Light">
+        <item name="windowSplashScreenBackground">@color/splash_classic_bg_light</item>
+        <item name="splashMark">@color/splash_classic_mark_light</item>
+        <item name="splashAccent">@color/splash_classic_accent_light</item>
+        <item name="android:windowLightStatusBar">true</item>
+    </style>
+    <style name="Theme.Travelogue.Splash.Classic.Dark">
+        <item name="windowSplashScreenBackground">@color/splash_classic_bg_dark</item>
+        <item name="splashMark">@color/splash_classic_mark_dark</item>
+        <item name="splashAccent">@color/splash_classic_accent_dark</item>
+        <item name="android:windowLightStatusBar">false</item>
+    </style>
+
+    <style name="Theme.Travelogue.Splash.Seaside">
+        <item name="windowSplashScreenBackground">@color/splash_seaside_bg</item>
+        <item name="windowSplashScreenAnimatedIcon">@drawable/ic_splash_seaside</item>
+        <item name="splashMark">@color/splash_seaside_mark</item>
+        <item name="splashAccent">@color/splash_seaside_accent</item>
+    </style>
+    <style name="Theme.Travelogue.Splash.Seaside.Light">
+        <item name="windowSplashScreenBackground">@color/splash_seaside_bg_light</item>
+        <item name="splashMark">@color/splash_seaside_mark_light</item>
+        <item name="splashAccent">@color/splash_seaside_accent_light</item>
+        <item name="android:windowLightStatusBar">true</item>
+    </style>
+    <style name="Theme.Travelogue.Splash.Seaside.Dark">
+        <item name="windowSplashScreenBackground">@color/splash_seaside_bg_dark</item>
+        <item name="splashMark">@color/splash_seaside_mark_dark</item>
+        <item name="splashAccent">@color/splash_seaside_accent_dark</item>
+        <item name="android:windowLightStatusBar">false</item>
+    </style>
+
+    <style name="Theme.Travelogue.Splash.Summit">
+        <item name="windowSplashScreenBackground">@color/splash_summit_bg</item>
+        <item name="windowSplashScreenAnimatedIcon">@drawable/ic_splash_summit</item>
+        <item name="splashMark">@color/splash_summit_mark</item>
+        <item name="splashAccent">@color/splash_summit_accent</item>
+    </style>
+    <style name="Theme.Travelogue.Splash.Summit.Light">
+        <item name="windowSplashScreenBackground">@color/splash_summit_bg_light</item>
+        <item name="splashMark">@color/splash_summit_mark_light</item>
+        <item name="splashAccent">@color/splash_summit_accent_light</item>
+        <item name="android:windowLightStatusBar">true</item>
+    </style>
+    <style name="Theme.Travelogue.Splash.Summit.Dark">
+        <item name="windowSplashScreenBackground">@color/splash_summit_bg_dark</item>
+        <item name="splashMark">@color/splash_summit_mark_dark</item>
+        <item name="splashAccent">@color/splash_summit_accent_dark</item>
+        <item name="android:windowLightStatusBar">false</item>
+    </style>
+
+    <style name="Theme.Travelogue.Splash.Sundown">
+        <item name="windowSplashScreenBackground">@color/splash_sundown_bg</item>
+        <item name="windowSplashScreenAnimatedIcon">@drawable/ic_splash_sundown</item>
+        <item name="splashMark">@color/splash_sundown_mark</item>
+        <item name="splashAccent">@color/splash_sundown_accent</item>
+    </style>
+    <style name="Theme.Travelogue.Splash.Sundown.Light">
+        <item name="windowSplashScreenBackground">@color/splash_sundown_bg_light</item>
+        <item name="splashMark">@color/splash_sundown_mark_light</item>
+        <item name="splashAccent">@color/splash_sundown_accent_light</item>
+        <item name="android:windowLightStatusBar">true</item>
+    </style>
+    <style name="Theme.Travelogue.Splash.Sundown.Dark">
+        <item name="windowSplashScreenBackground">@color/splash_sundown_bg_dark</item>
+        <item name="splashMark">@color/splash_sundown_mark_dark</item>
+        <item name="splashAccent">@color/splash_sundown_accent_dark</item>
+        <item name="android:windowLightStatusBar">false</item>
+    </style>
+
+    <style name="Theme.Travelogue.Splash.Airmail">
+        <item name="windowSplashScreenBackground">@color/splash_airmail_bg</item>
+        <item name="windowSplashScreenAnimatedIcon">@drawable/ic_splash_airmail</item>
+        <item name="splashMark">@color/splash_airmail_mark</item>
+        <item name="splashAccent">@color/splash_airmail_accent</item>
+    </style>
+    <style name="Theme.Travelogue.Splash.Airmail.Light">
+        <item name="windowSplashScreenBackground">@color/splash_airmail_bg_light</item>
+        <item name="splashMark">@color/splash_airmail_mark_light</item>
+        <item name="splashAccent">@color/splash_airmail_accent_light</item>
+        <item name="android:windowLightStatusBar">true</item>
+    </style>
+    <style name="Theme.Travelogue.Splash.Airmail.Dark">
+        <item name="windowSplashScreenBackground">@color/splash_airmail_bg_dark</item>
+        <item name="splashMark">@color/splash_airmail_mark_dark</item>
+        <item name="splashAccent">@color/splash_airmail_accent_dark</item>
+        <item name="android:windowLightStatusBar">false</item>
+    </style>
+
+    <style name="Theme.Travelogue.Splash.Fiesta">
+        <item name="windowSplashScreenBackground">@color/splash_fiesta_bg</item>
+        <item name="windowSplashScreenAnimatedIcon">@drawable/ic_splash_fiesta</item>
+        <item name="splashMark">@color/splash_fiesta_mark</item>
+        <item name="splashAccent">@color/splash_fiesta_accent</item>
+    </style>
+    <style name="Theme.Travelogue.Splash.Fiesta.Light">
+        <item name="windowSplashScreenBackground">@color/splash_fiesta_bg_light</item>
+        <item name="splashMark">@color/splash_fiesta_mark_light</item>
+        <item name="splashAccent">@color/splash_fiesta_accent_light</item>
+        <item name="android:windowLightStatusBar">true</item>
+    </style>
+    <style name="Theme.Travelogue.Splash.Fiesta.Dark">
+        <item name="windowSplashScreenBackground">@color/splash_fiesta_bg_dark</item>
+        <item name="splashMark">@color/splash_fiesta_mark_dark</item>
+        <item name="splashAccent">@color/splash_fiesta_accent_dark</item>
+        <item name="android:windowLightStatusBar">false</item>
+    </style>
+</resources>

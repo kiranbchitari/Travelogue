@@ -1,0 +1,15 @@
+<!-- Golden hour: a big sun sinking into thinning bands. Colours come from the start-up theme (splash_themes.xml). -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp" android:height="108dp"
+    android:viewportWidth="108" android:viewportHeight="108">
+    <path android:fillColor="?attr/splashMark"
+        android:pathData="M54,31a22,22 0,0 1,22 22h-44a22,22 0,0 1,22 -22z"/>
+    <path android:fillColor="#00000000" android:strokeColor="?attr/splashAccent"
+        android:strokeWidth="3.6" android:strokeLineCap="round" android:strokeLineJoin="round" android:pathData="M28,59.5h52"/>
+    <path android:fillColor="#00000000" android:strokeColor="?attr/splashAccent"
+        android:strokeWidth="3" android:strokeLineCap="round" android:strokeLineJoin="round" android:pathData="M34,66.5h40"/>
+    <path android:fillColor="#00000000" android:strokeColor="?attr/splashAccent"
+        android:strokeWidth="2.5" android:strokeLineCap="round" android:strokeLineJoin="round" android:pathData="M41,72.5h26"/>
+    <path android:fillColor="#00000000" android:strokeColor="?attr/splashAccent"
+        android:strokeWidth="2" android:strokeLineCap="round" android:strokeLineJoin="round" android:pathData="M48,77.5h12"/>
+</vector>

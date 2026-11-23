@@ -1,12 +1,13 @@
+<!-- The Travelogue mark: a sun setting over water. Colours come from the start-up theme (splash_themes.xml). -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="108dp" android:height="108dp"
     android:viewportWidth="108" android:viewportHeight="108">
-    <path android:fillColor="@color/splash_mark"
+    <path android:fillColor="?attr/splashMark"
         android:pathData="M54,36a18,18 0,0 1,18 18h-36a18,18 0,0 1,18 -18z"/>
-    <path android:fillColor="#00000000" android:strokeColor="@color/splash_mark"
-        android:strokeWidth="3" android:strokeLineCap="round" android:pathData="M30,60h48"/>
-    <path android:fillColor="#00000000" android:strokeColor="@color/splash_mark"
-        android:strokeWidth="3" android:strokeLineCap="round" android:pathData="M38,67h32"/>
-    <path android:fillColor="#00000000" android:strokeColor="@color/splash_mark"
-        android:strokeWidth="3" android:strokeLineCap="round" android:pathData="M47,74h14"/>
+    <path android:fillColor="#00000000" android:strokeColor="?attr/splashMark"
+        android:strokeWidth="3" android:strokeLineCap="round" android:strokeLineJoin="round" android:pathData="M30,60h48"/>
+    <path android:fillColor="#00000000" android:strokeColor="?attr/splashMark"
+        android:strokeWidth="3" android:strokeLineCap="round" android:strokeLineJoin="round" android:pathData="M38,67h32"/>
+    <path android:fillColor="#00000000" android:strokeColor="?attr/splashMark"
+        android:strokeWidth="3" android:strokeLineCap="round" android:strokeLineJoin="round" android:pathData="M47,74h14"/>
 </vector>

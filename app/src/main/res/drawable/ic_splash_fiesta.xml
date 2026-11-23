@@ -1,0 +1,21 @@
+<!-- Carnival: a striped hot-air balloon among confetti. Colours come from the start-up theme (splash_themes.xml). -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp" android:height="108dp"
+    android:viewportWidth="108" android:viewportHeight="108">
+    <path android:fillColor="?attr/splashMark"
+        android:pathData="M41,52L50,66L58,66L67,52z"/>
+    <path android:fillColor="?attr/splashMark"
+        android:pathData="M38,43a16,16 0,1 0,32 0a16,16 0,1 0,-32 0z"/>
+    <path android:fillColor="?attr/splashAccent"
+        android:pathData="M47,43a7,16 0,1 0,14 0a7,16 0,1 0,-14 0z"/>
+    <path android:fillColor="?attr/splashMark"
+        android:pathData="M50,70h8v5.5h-8z"/>
+    <path android:fillColor="?attr/splashAccent"
+        android:pathData="M27,35a2.2,2.2 0,1 0,4.4 0a2.2,2.2 0,1 0,-4.4 0z"/>
+    <path android:fillColor="?attr/splashAccent"
+        android:pathData="M76,62a2,2 0,1 0,4 0a2,2 0,1 0,-4 0z"/>
+    <path android:fillColor="?attr/splashMark"
+        android:pathData="M77,36a1.8,1.8 0,1 0,3.6 0a1.8,1.8 0,1 0,-3.6 0z"/>
+    <path android:fillColor="?attr/splashMark"
+        android:pathData="M29,64a1.8,1.8 0,1 0,3.6 0a1.8,1.8 0,1 0,-3.6 0z"/>
+</vector>

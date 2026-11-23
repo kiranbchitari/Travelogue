@@ -1,0 +1,15 @@
+<!-- Postcard: a paper plane and the trail behind it. Colours come from the start-up theme (splash_themes.xml). -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp" android:height="108dp"
+    android:viewportWidth="108" android:viewportHeight="108">
+    <path android:fillColor="?attr/splashMark"
+        android:pathData="M79,31L31,48L49,56z"/>
+    <path android:fillColor="?attr/splashMark" android:fillAlpha="0.62"
+        android:pathData="M79,31L49,56L56,75z"/>
+    <path android:fillColor="?attr/splashAccent"
+        android:pathData="M28,66a2,2 0,1 0,4 0a2,2 0,1 0,-4 0z"/>
+    <path android:fillColor="?attr/splashAccent"
+        android:pathData="M35,72a2,2 0,1 0,4 0a2,2 0,1 0,-4 0z"/>
+    <path android:fillColor="?attr/splashAccent"
+        android:pathData="M43,76a2,2 0,1 0,4 0a2,2 0,1 0,-4 0z"/>
+</vector>

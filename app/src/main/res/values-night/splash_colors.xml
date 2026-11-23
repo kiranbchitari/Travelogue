@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- In dark mode the start-up colours that follow the system point at each theme's dark set. -->
+<resources>
+    <color name="splash_classic_bg">@color/splash_classic_bg_dark</color>
+    <color name="splash_classic_mark">@color/splash_classic_mark_dark</color>
+    <color name="splash_classic_accent">@color/splash_classic_accent_dark</color>
+    <color name="splash_seaside_bg">@color/splash_seaside_bg_dark</color>
+    <color name="splash_seaside_mark">@color/splash_seaside_mark_dark</color>
+    <color name="splash_seaside_accent">@color/splash_seaside_accent_dark</color>
+    <color name="splash_summit_bg">@color/splash_summit_bg_dark</color>
+    <color name="splash_summit_mark">@color/splash_summit_mark_dark</color>
+    <color name="splash_summit_accent">@color/splash_summit_accent_dark</color>
+    <color name="splash_sundown_bg">@color/splash_sundown_bg_dark</color>
+    <color name="splash_sundown_mark">@color/splash_sundown_mark_dark</color>
+    <color name="splash_sundown_accent">@color/splash_sundown_accent_dark</color>
+    <color name="splash_airmail_bg">@color/splash_airmail_bg_dark</color>
+    <color name="splash_airmail_mark">@color/splash_airmail_mark_dark</color>
+    <color name="splash_airmail_accent">@color/splash_airmail_accent_dark</color>
+    <color name="splash_fiesta_bg">@color/splash_fiesta_bg_dark</color>
+    <color name="splash_fiesta_mark">@color/splash_fiesta_mark_dark</color>
+    <color name="splash_fiesta_accent">@color/splash_fiesta_accent_dark</color>
+</resources>
