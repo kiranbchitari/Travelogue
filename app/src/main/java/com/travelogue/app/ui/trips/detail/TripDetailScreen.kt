@@ -54,6 +54,7 @@ import com.travelogue.app.ui.places.TripPlacesTab
 import com.travelogue.app.ui.trips.PhotoTag
 import com.travelogue.app.ui.trips.phaseLabel
 import kotlinx.coroutines.launch
+import com.travelogue.app.domain.coverFrame
 
 @Composable
 fun TripDetailScreen(nav: Nav, tripId: Long, initialTab: Int) {
@@ -210,7 +211,7 @@ private fun Hero(
     val buttonTint = lerpColor(c.ink, Color.White, fraction)
     Box(Modifier.fillMaxWidth().height(height).background(c.background)) {
         Box(Modifier.matchParentSize().graphicsLayer { alpha = fraction.coerceIn(0f, 1f) }) {
-            PhotoImage(trip.coverPath, Modifier.matchParentSize(), contentDescription = trip.name, fallbackSeed = trip.uuid)
+            CoverImage(trip.coverPath, trip.coverFrame, Modifier.matchParentSize(), contentDescription = trip.name, fallbackSeed = trip.uuid)
             Box(
                 Modifier.fillMaxWidth().height(statusTop + 80.dp)
                     .background(androidx.compose.ui.graphics.Brush.verticalGradient(listOf(Color.Black.copy(alpha = 0.35f), Color.Transparent))),

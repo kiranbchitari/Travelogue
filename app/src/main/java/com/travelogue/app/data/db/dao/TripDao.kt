@@ -26,7 +26,7 @@ interface TripDao {
     @Query("DELETE FROM trips WHERE id = :id") suspend fun delete(id: Long)
     @Query("UPDATE trips SET archived = :archived, updatedAt = :now WHERE id = :id")
     suspend fun setArchived(id: Long, archived: Boolean, now: Long = System.currentTimeMillis())
-    @Query("UPDATE trips SET coverPath = :path, updatedAt = :now WHERE id = :id")
+    @Query("UPDATE trips SET coverPath = :path, coverFocusX = 0.5, coverFocusY = 0.5, coverZoom = 1.0, updatedAt = :now WHERE id = :id")
     suspend fun setCover(id: Long, path: String?, now: Long = System.currentTimeMillis())
 
     // Travellers on a trip

@@ -152,7 +152,7 @@ fun MemoriesScreen(nav: Nav) {
 private fun GalleryCard(g: TripGalleryCard, modifier: Modifier, onClick: () -> Unit) {
     SurfaceCard(modifier.fillMaxWidth(), onClick = onClick, contentPadding = PaddingValues(0.dp)) {
         Box(Modifier.fillMaxWidth().height(210.dp)) {
-            PhotoImage(g.coverPath, Modifier.fillMaxSize(), fallbackSeed = g.trip.name)
+            CoverImage(g.coverPath, g.coverFrame, Modifier.fillMaxSize(), fallbackSeed = g.trip.name)
             BottomScrim(0.7f, 0.7f)
             Column(Modifier.align(Alignment.BottomStart).padding(Space.lg)) {
                 Overline(Fmt.dateRange(g.trip.startDate, g.trip.endDate), color = Color.White.copy(alpha = 0.8f))

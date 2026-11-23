@@ -12,12 +12,16 @@ import com.travelogue.app.ui.diary.DiaryCardModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.*
 import java.time.YearMonth
+import com.travelogue.app.domain.CoverFrame
+import com.travelogue.app.domain.coverFrame
 
 data class TripGalleryCard(
     val trip: TripEntity,
     val photoCount: Int,
     val favouriteCount: Int,
     val coverPath: String?,
+    /** The trip's own framing when [coverPath] is its cover; centred for a photo standing in for one. */
+    val coverFrame: CoverFrame,
     val preview: List<TripPhotoEntity>,
 )
 
@@ -53,6 +57,7 @@ class MemoriesViewModel(trips: TripRepository, diary: DiaryRepository, photos: P
                     photoCount = ph.size,
                     favouriteCount = ph.count { it.isFavourite },
                     coverPath = t.coverPath ?: ph.firstOrNull { it.isFavourite }?.relativePath ?: ph.firstOrNull()?.relativePath,
+                    coverFrame = if (t.coverPath != null) t.coverFrame else CoverFrame.Center,
                     preview = (ph.filter { it.isFavourite } + ph).distinctBy { it.id }.take(3),
                 )
             }.sortedWith(compareByDescending<TripGalleryCard> { it.photoCount > 0 }.thenByDescending { it.trip.startDate }),

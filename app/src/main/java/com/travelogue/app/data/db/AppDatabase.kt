@@ -19,7 +19,7 @@ import com.travelogue.app.data.db.entity.*
         DiaryEntryEntity::class, TagEntity::class, DiaryEntryTagEntity::class, TripPhotoEntity::class,
         HolidayEntity::class,
     ],
-    version = 2,
+    version = 3,
     exportSchema = true,
 )
 @TypeConverters(Converters::class)
@@ -50,12 +50,21 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        /** Adds the cover framing: which part of a trip's cover shows, and how far zoomed in. */
+        private val MIGRATION_2_3 = object : Migration(2, 3) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE `trips` ADD COLUMN `coverFocusX` REAL NOT NULL DEFAULT 0.5")
+                db.execSQL("ALTER TABLE `trips` ADD COLUMN `coverFocusY` REAL NOT NULL DEFAULT 0.5")
+                db.execSQL("ALTER TABLE `trips` ADD COLUMN `coverZoom` REAL NOT NULL DEFAULT 1.0")
+            }
+        }
+
         /**
          * Explicit migrations only. Never use fallbackToDestructiveMigration: losing years of travel
          * memories on an app update is not acceptable. Add each new Migration(n, n+1) here and bump
          * the database version; the exported schemas in app/schemas let them be tested.
          */
-        val MIGRATIONS: Array<Migration> = arrayOf(MIGRATION_1_2)
+        val MIGRATIONS: Array<Migration> = arrayOf(MIGRATION_1_2, MIGRATION_2_3)
 
         fun build(context: Context): AppDatabase =
             Room.databaseBuilder(context, AppDatabase::class.java, NAME)

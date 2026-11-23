@@ -30,6 +30,14 @@ data class TripEntity(
     val description: String = "",
     /** Relative path inside app files dir, e.g. media/<uuid>/cover/abc.jpg */
     val coverPath: String? = null,
+    /**
+     * The point of the cover that stays in view wherever it is cropped (cards, header, thumbnails),
+     * as fractions 0..1 across and down. Set in the cover framing screen.
+     */
+    @ColumnInfo(defaultValue = "0.5") val coverFocusX: Float = 0.5f,
+    @ColumnInfo(defaultValue = "0.5") val coverFocusY: Float = 0.5f,
+    /** How far the cover is zoomed in around that point; 1 = just fills the frame. */
+    @ColumnInfo(defaultValue = "1.0") val coverZoom: Float = 1f,
     val status: TripStatus = TripStatus.PLANNING,
     val budget: Double = 0.0,
     val currency: String = "INR",

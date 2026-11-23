@@ -41,6 +41,13 @@ fun TripEditorScreen(nav: Nav, tripId: Long, presetStart: LocalDate? = null, pre
         onError = { Toast.makeText(context, it, Toast.LENGTH_LONG).show() },
     )
 
+    if (vm.framingCover) {
+        val model: Any? = vm.pendingCover ?: vm.savedCoverPath?.let { java.io.File(context.filesDir, it) }
+        if (model != null) {
+            CoverFramerDialog(model, vm.name, vm.coverFrame, onDone = vm::setFrame, onDismiss = vm::closeFraming)
+        }
+    }
+
     ScreenScaffold(
         title = if (vm.isNew) "New trip" else "Edit trip",
         subtitle = if (vm.isNew) "Every story starts somewhere" else vm.name.ifBlank { null },
@@ -78,13 +85,13 @@ fun TripEditorScreen(nav: Nav, tripId: Long, presetStart: LocalDate? = null, pre
                     .padding(top = Space.sm, bottom = Space.xxxl),
                 verticalArrangement = Arrangement.spacedBy(Space.xxl),
             ) {
-                SinglePhotoField(
-                    label = "Cover photograph",
+                CoverPhotoField(
                     savedPath = vm.savedCoverPath,
                     pending = vm.pendingCover,
+                    frame = vm.coverFrame,
                     onPick = vm::pickCover,
                     onRemove = vm::clearCover,
-                    height = 200.dp,
+                    onFrame = vm::openFraming,
                 )
 
                 FormSection("The trip") {

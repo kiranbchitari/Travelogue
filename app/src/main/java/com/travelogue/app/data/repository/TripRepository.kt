@@ -60,6 +60,10 @@ class TripRepository(private val db: AppDatabase, private val media: MediaStorag
             val toSave = trip.copy(
                 uuid = uuid,
                 coverPath = coverPath,
+                // Framing belongs to the photo; with no cover it goes back to centred.
+                coverFocusX = if (coverPath == null) 0.5f else trip.coverFocusX,
+                coverFocusY = if (coverPath == null) 0.5f else trip.coverFocusY,
+                coverZoom = if (coverPath == null) 1f else trip.coverZoom,
                 travellerCount = maxOf(trip.travellerCount, names.size, 1),
                 updatedAt = System.currentTimeMillis(),
             )

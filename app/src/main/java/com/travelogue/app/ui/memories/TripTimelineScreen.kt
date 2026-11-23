@@ -34,6 +34,8 @@ import com.travelogue.app.ui.common.appViewModel
 import com.travelogue.app.ui.diary.DiaryCardModel
 import com.travelogue.app.ui.diary.DiaryEntryCard
 import com.travelogue.app.ui.navigation.Nav
+import com.travelogue.app.domain.CoverFrame
+import com.travelogue.app.domain.coverFrame
 
 @Composable
 fun TripTimelineScreen(nav: Nav, tripId: Long) {
@@ -102,7 +104,7 @@ fun TripTimelineScreen(nav: Nav, tripId: Long) {
 private fun StoryHero(trip: TripEntity?, state: TimelineState) {
     Column {
         Box(Modifier.fillMaxWidth().height(340.dp)) {
-            PhotoImage(trip?.coverPath, Modifier.fillMaxSize(), fallbackSeed = trip?.name.orEmpty())
+            CoverImage(trip?.coverPath, trip?.coverFrame ?: CoverFrame.Center, Modifier.fillMaxSize(), fallbackSeed = trip?.name.orEmpty())
             BottomScrim(0.75f, 0.8f)
             if (trip != null) {
                 Column(Modifier.align(Alignment.BottomStart).padding(Space.gutter)) {

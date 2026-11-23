@@ -17,6 +17,8 @@ import com.travelogue.app.data.db.entity.TravelType
 import com.travelogue.app.data.db.entity.TripEntity
 import com.travelogue.app.data.db.entity.TripStatus
 import com.travelogue.app.di.AppContainer
+import com.travelogue.app.domain.CoverFrame
+import com.travelogue.app.domain.coverFrame
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.map
@@ -66,6 +68,10 @@ class TripEditorViewModel(
     var savedCoverPath by mutableStateOf<String?>(null); private set
     var pendingCover by mutableStateOf<Uri?>(null); private set
     private var removeCover = false
+    /** Which part of the cover shows on cards and headers. */
+    var coverFrame by mutableStateOf(CoverFrame.Center); private set
+    /** The framing screen is open (it opens by itself right after a new photo is picked). */
+    var framingCover by mutableStateOf(false); private set
 
     /** For new trips the status follows the dates until the user picks one. */
     private var statusTouched = !isNew
@@ -82,6 +88,7 @@ class TripEditorViewModel(
         "travellerCount" to travellerCount, "travellerNames" to ArrayList(travellerNames), "description" to description, "notes" to notes,
         "status" to status, "statusTouched" to statusTouched, "budget" to budget, "currency" to currency, "travelType" to travelType,
         "removeCover" to removeCover,
+        "coverX" to coverFrame.x, "coverY" to coverFrame.y, "coverZoom" to coverFrame.zoom,
     )
 
     private fun applyDraft(b: Bundle) {
@@ -93,6 +100,7 @@ class TripEditorViewModel(
         status = b.read("status") ?: status; statusTouched = b.getBoolean("statusTouched", statusTouched)
         budget = b.read("budget") ?: budget; currency = b.read("currency") ?: currency; travelType = b.read("travelType") ?: travelType
         if (b.getBoolean("removeCover")) { removeCover = true; savedCoverPath = null }
+        if (b.containsKey("coverX")) coverFrame = CoverFrame.of(b.getFloat("coverX"), b.getFloat("coverY"), b.getFloat("coverZoom"))
     }
 
     init {
@@ -120,6 +128,7 @@ class TripEditorViewModel(
                     currency = t.currency
                     travelType = t.travelType
                     savedCoverPath = t.coverPath
+                    coverFrame = t.coverFrame
                     travellerNames = c.trips.getTravellers(tripId).map { it.name }
                 }
             }
@@ -166,12 +175,25 @@ class TripEditorViewModel(
     fun pickCover(uri: Uri) {
         pendingCover = uri
         removeCover = false
+        // A new photo starts centred, and the user is asked straight away what should show.
+        coverFrame = CoverFrame.Center
+        framingCover = true
     }
 
     fun clearCover() {
         pendingCover = null
         removeCover = savedCoverPath != null
         savedCoverPath = null
+        coverFrame = CoverFrame.Center
+        framingCover = false
+    }
+
+    fun openFraming() { if (pendingCover != null || savedCoverPath != null) framingCover = true }
+    fun closeFraming() { framingCover = false }
+
+    fun setFrame(frame: CoverFrame) {
+        coverFrame = frame
+        framingCover = false
     }
 
     private fun validate(): Boolean {
@@ -218,6 +240,9 @@ class TripEditorViewModel(
                     travellerCount = travellerCount.trim().toInt(),
                     description = description.trim(),
                     coverPath = base?.coverPath,
+                    coverFocusX = coverFrame.x,
+                    coverFocusY = coverFrame.y,
+                    coverZoom = coverFrame.zoom,
                     status = status,
                     budget = budget.toAmountOrNull() ?: 0.0,
                     currency = currency.uppercase(),

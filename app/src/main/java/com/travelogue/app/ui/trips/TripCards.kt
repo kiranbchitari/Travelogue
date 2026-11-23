@@ -29,6 +29,7 @@ import com.travelogue.app.data.db.entity.ExpenseCategoryEntity
 import com.travelogue.app.data.db.entity.ExpenseEntity
 import com.travelogue.app.data.db.entity.TripEntity
 import com.travelogue.app.data.db.entity.TripPhotoEntity
+import com.travelogue.app.domain.coverFrame
 
 /** Translucent label that sits on top of a photo. */
 @Composable
@@ -66,7 +67,7 @@ fun TripHeroCard(
             .shadow(if (c.isDark) 0.dp else 14.dp, Shapes.lg, ambientColor = Color(0x1A000000), spotColor = Color(0x33000000))
             .clip(Shapes.lg),
     ) {
-        PhotoImage(trip.coverPath, Modifier.matchParentSize(), contentDescription = trip.name, fallbackSeed = trip.uuid)
+        CoverImage(trip.coverPath, trip.coverFrame, Modifier.matchParentSize(), contentDescription = trip.name, fallbackSeed = trip.uuid)
         BottomScrim(0.8f, 0.88f)
         Row(Modifier.align(Alignment.TopStart).padding(Space.lg), horizontalArrangement = Arrangement.spacedBy(Space.sm)) {
             if (showPhase) PhotoTag(trip.phaseLabel(), dot = trip.status.color())
@@ -123,7 +124,7 @@ fun TripRow(summary: TripSummary, onClick: () -> Unit, modifier: Modifier = Modi
         modifier.fillMaxWidth().clip(Shapes.md).clickable(onClick = onClick).padding(vertical = Space.sm),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        PhotoImage(trip.coverPath, Modifier.size(width = 68.dp, height = 84.dp).clip(Shapes.sm), fallbackSeed = trip.uuid)
+        CoverImage(trip.coverPath, trip.coverFrame, Modifier.size(width = 68.dp, height = 84.dp).clip(Shapes.sm), fallbackSeed = trip.uuid)
         Spacer(Modifier.width(Space.lg))
         Column(Modifier.weight(1f)) {
             Text(trip.name, style = Travel.type.title.copy(fontSize = 18.sp), color = Travel.colors.ink, maxLines = 1, overflow = TextOverflow.Ellipsis)
