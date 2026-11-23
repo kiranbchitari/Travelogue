@@ -19,7 +19,9 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.SerializationException
+import kotlin.coroutines.cancellation.CancellationException
 import java.io.File
+import java.io.FileNotFoundException
 import java.io.IOException
 import java.io.InputStream
 import java.io.OutputStream
@@ -57,21 +59,32 @@ class BackupManager(
     // =========================================================================================
 
     suspend fun exportTrip(tripId: Long, target: Uri, progress: Progress = { _, _ -> }): ExportResult = withContext(Dispatchers.IO) {
-        val bundle = collect(tripId) ?: throw BackupException("This trip no longer exists.")
+        // One transaction: every row comes from the same moment, even if the user is editing meanwhile.
+        val bundle = db.withTransaction { collect(tripId) } ?: throw BackupException("This trip no longer exists.")
         writeArchive(target, BackupType.TRIP, listOf(bundle), settingsArchive = null, progress)
     }
 
     suspend fun exportAll(target: Uri, progress: Progress = { _, _ -> }): ExportResult = withContext(Dispatchers.IO) {
-        val ids = db.tripDao().getAll().map { it.id }
-        val bundles = ids.mapNotNull { collect(it) }
+        // Every database read happens in one transaction, so the backup is a single consistent snapshot
+        // even if the user edits or deletes something while it runs. It is only reads, so it is quick.
+        class Snapshot(val bundles: List<Bundle>, val holidays: List<HolidayEntity>, val travellers: List<TravellerEntity>, val categories: List<ExpenseCategoryEntity>)
+        val snap = db.withTransaction {
+            Snapshot(
+                bundles = db.tripDao().getAll().mapNotNull { collect(it.id) },
+                holidays = db.holidayDao().getAll(),
+                travellers = db.travellerDao().getAll(),
+                categories = db.expenseDao().getCategories(),
+            )
+        }
+        val bundles = snap.bundles
+        val holidays = snap.holidays
         val s = settings.current()
         val holidayPrefs = settings.holidayPrefs.first()
-        val holidays = db.holidayDao().getAll()
         val settingsArchive = SettingsArchive(
             defaultCurrency = s.defaultCurrency,
             themeMode = s.themeMode.name,
-            travellers = db.travellerDao().getAll(),
-            categories = db.expenseDao().getCategories(),
+            travellers = snap.travellers,
+            categories = snap.categories,
             exchangeRates = s.exchangeRates.map { SettingsRepository.encodeRates(listOf(it)) },
             holidays = holidays,
             holidayPrefs = HolidayPrefsArchive(
@@ -143,16 +156,8 @@ class BackupManager(
     ): ExportResult {
         val prefixOf = { b: Bundle -> if (type == BackupType.FULL) "trips/${b.archive.trip.uuid}/" else "" }
         val existing = bundles.flatMap { b -> b.files.filter { it.value.isFile }.map { (p, f) -> prefixOf(b) + p to f } }
-        val missing = bundles.sumOf { b -> b.files.count { !it.value.isFile } }
-        val manifest = Manifest(
-            type = type,
-            appVersion = BuildConfig.VERSION_NAME,
-            exportedAt = LocalDateTime.now().withNano(0).toString(),
-            trips = bundles.map {
-                ManifestTrip(it.archive.trip.uuid, it.archive.trip.name, prefixOf(it), it.archive.trip.startDate.toString(), it.archive.trip.endDate.toString())
-            },
-            files = existing.map { ManifestFile(it.first, it.second.length()) },
-        )
+        var missing = bundles.sumOf { b -> b.files.count { !it.value.isFile } }
+        val added = mutableListOf<ManifestFile>()
         val totalBytes = existing.sumOf { it.second.length() }.coerceAtLeast(1)
         var written = 0L
         val out: OutputStream = context.contentResolver.openOutputStream(target, "wt")
@@ -161,24 +166,47 @@ class BackupManager(
             ZipOutputStream(out.buffered()).use { zip ->
                 progress(0f, "Writing trip data")
                 zip.setLevel(Deflater.DEFAULT_COMPRESSION)
-                zip.putText("manifest.json", BackupJson.encodeToString(Manifest.serializer(), manifest))
                 settingsArchive?.let { zip.putText("settings.json", BackupJson.encodeToString(SettingsArchive.serializer(), it)) }
                 bundles.forEach { b -> zip.putText(prefixOf(b) + "trip.json", BackupJson.encodeToString(TripArchive.serializer(), b.archive)) }
                 // Photos are already JPEG-compressed; storing them avoids wasting CPU.
                 zip.setLevel(Deflater.NO_COMPRESSION)
                 existing.forEachIndexed { i, (path, file) ->
-                    zip.putNextEntry(ZipEntry(path))
-                    file.inputStream().use { it.copyTo(zip) }
-                    zip.closeEntry()
-                    written += file.length()
+                    // Copying can take a while. A file deleted since the snapshot (a cover replaced, a
+                    // photo removed) is counted as missing, the same as one that was already gone,
+                    // rather than failing the whole backup. Import already tolerates missing files.
+                    val input = try {
+                        file.inputStream()
+                    } catch (e: FileNotFoundException) {
+                        missing++
+                        return@forEachIndexed
+                    }
+                    input.use {
+                        zip.putNextEntry(ZipEntry(path))
+                        val n = it.copyTo(zip)
+                        zip.closeEntry()
+                        written += n
+                        added += ManifestFile(path, n)
+                    }
                     progress(written.toFloat() / totalBytes, "Adding files ${i + 1} of ${existing.size}")
                 }
+                // Written last so it lists exactly the files that made it in.
+                zip.setLevel(Deflater.DEFAULT_COMPRESSION)
+                val manifest = Manifest(
+                    type = type,
+                    appVersion = BuildConfig.VERSION_NAME,
+                    exportedAt = LocalDateTime.now().withNano(0).toString(),
+                    trips = bundles.map {
+                        ManifestTrip(it.archive.trip.uuid, it.archive.trip.name, prefixOf(it), it.archive.trip.startDate.toString(), it.archive.trip.endDate.toString())
+                    },
+                    files = added,
+                )
+                zip.putText("manifest.json", BackupJson.encodeToString(Manifest.serializer(), manifest))
             }
         } catch (e: IOException) {
             throw BackupException("Export failed: ${e.message ?: "could not write the file"}", e)
         }
         progress(1f, "Done")
-        return ExportResult(bundles.size, existing.size, written, missing)
+        return ExportResult(bundles.size, added.size, written, missing)
     }
 
     private fun ZipOutputStream.putText(path: String, text: String) {
@@ -216,7 +244,7 @@ class BackupManager(
         progress(0f, "Reading archive")
         val name = media.displayName(source).orEmpty()
         if (name.isNotEmpty() && !name.endsWith(".zip", ignoreCase = true)) throw BackupException("Please choose a Travelogue .zip file.")
-        val temp = File(context.cacheDir, "import-${UUID.randomUUID()}.zip")
+        val temp = File(context.cacheDir, "$IMPORT_PREFIX${UUID.randomUUID()}.zip")
         try {
             val input: InputStream = context.contentResolver.openInputStream(source) ?: throw BackupException("Could not open the selected file.")
             input.use { i -> temp.outputStream().use { o -> copyLimited(i, o, MAX_ARCHIVE_BYTES) } }
@@ -327,42 +355,99 @@ class BackupManager(
     /**
      * Restores the trips in [session]. Files are extracted to a staging folder first; the database
      * work for each trip runs in one transaction, so a failure never leaves a half-imported trip.
+     *
+     * A trip that fails does not stop the others, and does not undo the ones already restored. The
+     * result names every trip that failed with its error and carries a [ImportResult.retry] session
+     * for just those. Only a single-trip archive with nothing else in it fails as a whole.
      */
     suspend fun import(session: ImportSession, strategy: DuplicateStrategy, progress: Progress = { _, _ -> }): ImportResult = withContext(Dispatchers.IO) { stagingLock.withLock {
         val warnings = mutableListOf<String>()
         var imported = 0
         var skipped = 0
         var holidays = 0
+        var settingsError: String? = null
+        val failed = mutableListOf<FailedTrip>()
+        val failedIndices = mutableListOf<Int>()
+        var firstError: Exception? = null
         try {
             ZipFile(session.file).use { zip ->
-                session.settingsArchive?.let { holidays = restoreSettings(it) }
+                session.settingsArchive?.let { s ->
+                    try {
+                        holidays = restoreSettings(s)
+                    } catch (e: CancellationException) {
+                        throw e
+                    } catch (e: Exception) {
+                        settingsError = reasonFor(e)
+                    }
+                }
                 val n = session.archives.size.coerceAtLeast(1)
+                // Once the disk is full every later trip would fail the same way; don't churn through them.
+                var stopReason: String? = null
                 session.archives.forEachIndexed { index, (mt, archive) ->
+                    stopReason?.let { failed += FailedTrip(archive.trip.name, it); failedIndices += index; return@forEachIndexed }
                     val base = index.toFloat() / n
                     val span = 1f / n
-                    val existing = db.tripDao().getByUuid(archive.trip.uuid)
-                    if (existing != null && strategy == DuplicateStrategy.SKIP) { skipped++; return@forEachIndexed }
-                    progress(base, "Restoring “${archive.trip.name}”")
-                    val targetUuid = if (existing != null && strategy == DuplicateStrategy.KEEP_BOTH) UUID.randomUUID().toString() else archive.trip.uuid
-                    val replace = existing != null && strategy == DuplicateStrategy.REPLACE
-                    warnings += importTrip(zip, mt.path, archive, targetUuid, if (replace) existing else null, keepBothSuffix = existing != null && !replace) { f, msg ->
-                        progress(base + span * f, msg)
+                    try {
+                        val existing = db.tripDao().getByUuid(archive.trip.uuid)
+                        if (existing != null && strategy == DuplicateStrategy.SKIP) { skipped++; return@forEachIndexed }
+                        progress(base, "Restoring “${archive.trip.name}”")
+                        val targetUuid = if (existing != null && strategy == DuplicateStrategy.KEEP_BOTH) UUID.randomUUID().toString() else archive.trip.uuid
+                        val replace = existing != null && strategy == DuplicateStrategy.REPLACE
+                        warnings += importTrip(zip, mt.path, archive, targetUuid, if (replace) existing else null, keepBothSuffix = existing != null && !replace) { f, msg ->
+                            progress(base + span * f, msg)
+                        }
+                        imported++
+                    } catch (e: CancellationException) {
+                        throw e
+                    } catch (e: Exception) {
+                        if (firstError == null) firstError = e
+                        val reason = reasonFor(e)
+                        failed += FailedTrip(archive.trip.name, reason)
+                        failedIndices += index
+                        if (isOutOfSpace(e)) stopReason = "Not attempted: $reason"
                     }
-                    imported++
                 }
             }
-        } catch (e: BackupException) {
-            throw e
-        } catch (e: StorageFullException) {
-            throw BackupException(e.message ?: "Not enough storage.", e)
-        } catch (e: Exception) {
-            throw BackupException("Import failed: ${e.message ?: e.javaClass.simpleName}", e)
-        } finally {
+            // A single-trip archive that failed changed nothing on this device: report it as the error
+            // it was. (A retry narrowed to one trip of a full backup keeps the report and the retry.)
+            firstError?.let { e ->
+                if (session.manifest.type == BackupType.TRIP) {
+                    throw e as? BackupException ?: BackupException(reasonFor(e), e)
+                }
+            }
+        } catch (e: Throwable) {
             session.file.delete()
+            throw if (e is Exception && e !is BackupException && e !is CancellationException) BackupException(reasonFor(e), e) else e
         }
+        val retry = if (failed.isNotEmpty() || settingsError != null) {
+            val keep = failedIndices.toSet()
+            val archives = session.archives.filterIndexed { i, _ -> i in keep }
+            val uuids = archives.map { it.second.trip.uuid }.toSet()
+            ImportSession(
+                file = session.file,
+                manifest = session.manifest,
+                archives = archives,
+                // Settings are applied again only if they were what failed.
+                settingsArchive = session.settingsArchive?.takeIf { settingsError != null },
+                preview = session.preview.copy(trips = session.preview.trips.filter { it.uuid in uuids }),
+            )
+        } else null
+        // The retry session reuses the archive, so it stays until that retry runs or is discarded.
+        if (retry == null) session.file.delete()
         progress(1f, "Done")
-        ImportResult(imported, skipped, warnings, holidays)
+        ImportResult(imported, skipped, warnings, holidays, failed, settingsError, retry)
     } }
+
+    /** The message shown for an import error, keeping the original wording where there is one. */
+    private fun reasonFor(e: Exception): String = when {
+        e is BackupException -> e.message ?: "Import failed."
+        isOutOfSpace(e) -> e.message?.takeIf { e is StorageFullException } ?: "Not enough storage on this phone."
+        else -> "Import failed: ${e.message ?: e.javaClass.simpleName}"
+    }
+
+    private fun isOutOfSpace(e: Throwable): Boolean =
+        e is StorageFullException || e.cause is StorageFullException || e is android.database.sqlite.SQLiteFullException ||
+            (e is IOException && e.message.orEmpty().let { "ENOSPC" in it || "No space left" in it })
 
     /** Imports and the start-up recovery below both move files through staging folders; never at once. */
     private val stagingLock = kotlinx.coroutines.sync.Mutex()
@@ -380,6 +465,10 @@ class BackupManager(
      */
     suspend fun recoverInterruptedImports() = withContext(Dispatchers.IO) {
         stagingLock.withLock {
+            // Archives copied for an import (or kept for a retry) that the process died holding.
+            val staleBefore = System.currentTimeMillis() - STALE_IMPORT_MS
+            context.cacheDir.listFiles { f -> f.isFile && f.name.startsWith(IMPORT_PREFIX) && f.name.endsWith(".zip") && f.lastModified() < staleBefore }
+                ?.forEach { it.delete() }
             val mediaRoot = File(media.root, MediaStorage.MEDIA_DIR)
             val leftovers = mediaRoot.listFiles { f -> f.isDirectory && f.name.startsWith(STAGING_PREFIX) } ?: return@withLock
             for (staging in leftovers) {
@@ -543,13 +632,21 @@ class BackupManager(
             throw e
         }
 
-        // 3. Move files into place (after the transaction committed).
+        // 3. Move files into place (after the transaction committed). The trip is saved from here on,
+        // so a failure must not be reported as a failed trip (a retry would import it twice). Whatever
+        // is still in staging is moved by recoverInterruptedImports() on the next start.
         progress(0.95f, "Finishing")
-        if (replacing != null) media.deleteTripMedia(replacing.uuid)
-        finalDir.deleteRecursively()
-        if (!staging.renameTo(finalDir)) {
-            staging.copyRecursively(finalDir, overwrite = true)
-            staging.deleteRecursively()
+        try {
+            if (replacing != null) media.deleteTripMedia(replacing.uuid)
+            finalDir.deleteRecursively()
+            if (!staging.renameTo(finalDir)) {
+                staging.copyRecursively(finalDir, overwrite = true)
+                staging.deleteRecursively()
+            }
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            warnings += "Some photos couldn't be moved into place yet; they'll be finished the next time the app starts."
         }
         return warnings.map { "${a.trip.name}: $it" }
     }
@@ -624,6 +721,9 @@ class BackupManager(
         const val MAX_ENTRIES = 50_000
         val ALLOWED_EXTENSIONS = setOf("json", "jpg", "jpeg", "png", "webp", "heic", "heif", "gif", "pdf", "bin")
         private const val STAGING_PREFIX = ".staging-"
+        private const val IMPORT_PREFIX = "import-"
+        /** Older than any import still being prepared when the app starts. */
+        private const val STALE_IMPORT_MS = 10 * 60 * 1000L
         /** Guards the calendar against nonsense dates in a hand-edited backup. */
         private val HOLIDAY_YEARS = 1970..2200
         private val DOCUMENT_EXTENSION = Regex("[a-z0-9]{1,8}")

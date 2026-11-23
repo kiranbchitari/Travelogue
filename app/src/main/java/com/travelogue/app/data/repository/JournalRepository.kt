@@ -59,13 +59,15 @@ class JournalRepository(
         val previous = if (activity.id != 0L) itinerary.getActivity(activity.id) else null
         var path = previous?.photoPath ?: activity.photoPath
         var toDelete: String? = null
+        var imported: String? = null
         if (newPhoto != null) {
-            path = media.importImage(newPhoto, trip.uuid, PhotoOwner.ACTIVITY.folder).relativePath
+            imported = media.importImage(newPhoto, trip.uuid, PhotoOwner.ACTIVITY.folder).relativePath
+            path = imported
             toDelete = previous?.photoPath
         } else if (removePhoto) {
             toDelete = path; path = null
         }
-        val id = if (activity.id == 0L) {
+        val id = media.recordOrDiscard(imported) { if (activity.id == 0L) {
             val order = itinerary.maxSort(activity.dayId) + 1
             itinerary.insertActivity(activity.copy(photoPath = path, sortOrder = order))
         } else {
@@ -74,7 +76,7 @@ class JournalRepository(
                 activity.copy(photoPath = path, sortOrder = itinerary.maxSort(activity.dayId) + 1)
             } else activity.copy(photoPath = path)
             itinerary.updateActivity(row); activity.id
-        }
+        } }
         toDelete?.let { media.delete(it) }
         return id
     }

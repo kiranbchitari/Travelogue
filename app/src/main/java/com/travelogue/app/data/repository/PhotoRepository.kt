@@ -30,13 +30,15 @@ class PhotoRepository(private val db: AppDatabase, private val media: MediaStora
         val start = dao.getForTrip(tripId).size
         return uris.mapIndexed { i, uri ->
             val stored = media.importImage(uri, trip.uuid, owner.folder)
-            dao.insert(
-                TripPhotoEntity(
-                    tripId = tripId, ownerType = owner, ownerId = ownerId, relativePath = stored.relativePath,
-                    caption = captions[uri].orEmpty(), takenAt = takenAt, width = stored.width, height = stored.height,
-                    sizeBytes = stored.sizeBytes, sortOrder = start + i,
-                ),
-            )
+            media.recordOrDiscard(stored.relativePath) {
+                dao.insert(
+                    TripPhotoEntity(
+                        tripId = tripId, ownerType = owner, ownerId = ownerId, relativePath = stored.relativePath,
+                        caption = captions[uri].orEmpty(), takenAt = takenAt, width = stored.width, height = stored.height,
+                        sizeBytes = stored.sizeBytes, sortOrder = start + i,
+                    ),
+                )
+            }
         }
     }
 

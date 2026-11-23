@@ -9,10 +9,12 @@ import android.os.Build
 import android.provider.OpenableColumns
 import android.webkit.MimeTypeMap
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.withContext
 import java.io.File
 import java.io.IOException
 import java.util.UUID
+import kotlin.coroutines.cancellation.CancellationException
 
 class StorageFullException(message: String) : IOException(message)
 
@@ -41,16 +43,18 @@ class MediaStorage(private val context: Context) {
         ensureSpace(estimateSize(uri))
         val dir = File(tripDir(tripUuid), folder).apply { mkdirs() }
         val target = File(dir, "${UUID.randomUUID()}.jpg")
-        val bitmap = decodeScaled(uri)
-        if (bitmap != null) {
-            target.outputStream().use { bitmap.compress(Bitmap.CompressFormat.JPEG, JPEG_QUALITY, it) }
-            val result = StoredImage(relative(target), bitmap.width, bitmap.height, target.length())
-            bitmap.recycle()
-            result
-        } else {
-            // Unknown format: keep the original bytes.
-            copyRaw(uri, target)
-            StoredImage(relative(target), 0, 0, target.length())
+        writeOrDelete(target) {
+            val bitmap = decodeScaled(uri)
+            if (bitmap != null) {
+                target.outputStream().use { bitmap.compress(Bitmap.CompressFormat.JPEG, JPEG_QUALITY, it) }
+                val result = StoredImage(relative(target), bitmap.width, bitmap.height, target.length())
+                bitmap.recycle()
+                result
+            } else {
+                // Unknown format: keep the original bytes.
+                copyRaw(uri, target)
+                StoredImage(relative(target), 0, 0, target.length())
+            }
         }
     }
 
@@ -72,8 +76,34 @@ class MediaStorage(private val context: Context) {
             ?: "bin"
         val dir = File(tripDir(tripUuid), folder).apply { mkdirs() }
         val target = File(dir, "${UUID.randomUUID()}.$ext")
-        copyRaw(uri, target)
-        StoredDocument(relative(target), name, mime, target.length())
+        writeOrDelete(target) {
+            copyRaw(uri, target)
+            StoredDocument(relative(target), name, mime, target.length())
+        }
+    }
+
+    /** A copy cut off part-way (full disk, unreadable source) must not leave a broken file behind. */
+    private inline fun <T> writeOrDelete(target: File, write: () -> T): T = try {
+        write()
+    } catch (e: Throwable) {
+        target.delete()
+        throw e
+    }
+
+    /**
+     * Runs [write], the database change that records the just-imported file at [newPath]. If it fails,
+     * nothing points at the file, so it is deleted rather than left behind as an orphan.
+     *
+     * Cancellation is left alone: Room may already have committed the write when it is noticed, and
+     * deleting the file then would break a saved record. A rare leftover is the lesser harm.
+     */
+    suspend inline fun <T> recordOrDiscard(newPath: String?, write: () -> T): T = try {
+        write()
+    } catch (e: CancellationException) {
+        throw e
+    } catch (e: Throwable) {
+        if (newPath != null) withContext(NonCancellable) { delete(newPath) }
+        throw e
     }
 
     /** Writes an already-encoded bitmap (used for generated demo covers). */

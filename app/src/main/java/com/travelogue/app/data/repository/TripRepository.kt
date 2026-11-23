@@ -46,15 +46,17 @@ class TripRepository(private val db: AppDatabase, private val media: MediaStorag
         val previous = if (trip.id != 0L) trips.get(trip.id) else null
         var coverPath = previous?.coverPath ?: trip.coverPath
         var oldCoverToDelete: String? = null
+        var importedCover: String? = null
         if (newCover != null) {
-            coverPath = media.importImage(newCover, uuid, "cover").relativePath
+            importedCover = media.importImage(newCover, uuid, "cover").relativePath
+            coverPath = importedCover
             oldCoverToDelete = previous?.coverPath
         } else if (removeCover) {
             oldCoverToDelete = coverPath
             coverPath = null
         }
         val names = travellerNames.map { it.trim() }.filter { it.isNotEmpty() }.distinctBy { it.lowercase() }
-        val id = db.withTransaction {
+        val id = media.recordOrDiscard(importedCover) { db.withTransaction {
             val toSave = trip.copy(
                 uuid = uuid,
                 coverPath = coverPath,
@@ -70,7 +72,7 @@ class TripRepository(private val db: AppDatabase, private val media: MediaStorag
             trips.insertTripTravellers(rows)
             ensureItineraryDays(id, toSave.startDate, toSave.endDate)
             id
-        }
+        } }
         oldCoverToDelete?.let { media.delete(it) }
         return id
     }
@@ -119,12 +121,14 @@ class TripRepository(private val db: AppDatabase, private val media: MediaStorag
     suspend fun addDocument(tripId: Long, owner: DocumentOwner, ownerId: Long?, uri: Uri): Long {
         val trip = trips.get(tripId) ?: error("Trip not found")
         val stored = media.importDocument(uri, trip.uuid)
-        return trips.insertDocument(
-            DocumentEntity(
-                tripId = tripId, ownerType = owner, ownerId = ownerId, relativePath = stored.relativePath,
-                fileName = stored.fileName, mimeType = stored.mimeType, sizeBytes = stored.sizeBytes,
-            ),
-        )
+        return media.recordOrDiscard(stored.relativePath) {
+            trips.insertDocument(
+                DocumentEntity(
+                    tripId = tripId, ownerType = owner, ownerId = ownerId, relativePath = stored.relativePath,
+                    fileName = stored.fileName, mimeType = stored.mimeType, sizeBytes = stored.sizeBytes,
+                ),
+            )
+        }
     }
 
     suspend fun deleteDocument(id: Long) {
