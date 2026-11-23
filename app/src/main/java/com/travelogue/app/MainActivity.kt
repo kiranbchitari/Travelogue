@@ -40,7 +40,7 @@ class MainActivity : ComponentActivity() {
                 )
                 onDispose {}
             }
-            TravelogueTheme(mode = s.themeMode) {
+            TravelogueTheme(mode = s.themeMode, theme = s.theme) {
                 AppRoot()
             }
         }

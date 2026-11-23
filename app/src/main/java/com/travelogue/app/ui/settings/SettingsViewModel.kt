@@ -2,6 +2,7 @@ package com.travelogue.app.ui.settings
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.travelogue.app.core.designsystem.theme.AppTheme
 import com.travelogue.app.core.designsystem.theme.ThemeMode
 import com.travelogue.app.core.storage.StorageUsage
 import com.travelogue.app.data.backup.BackupStatus
@@ -44,6 +45,7 @@ class SettingsViewModel(private val c: AppContainer) : ViewModel() {
     fun refreshUsage() = viewModelScope.launch { _usage.value = runCatching { c.media.usage() }.getOrNull() }
 
     fun setTheme(mode: ThemeMode) = viewModelScope.launch { c.settings.setTheme(mode) }
+    fun setAppTheme(theme: AppTheme) = viewModelScope.launch { c.settings.setAppTheme(theme) }
     fun setCurrency(code: String) = viewModelScope.launch { c.settings.setDefaultCurrency(code) }
 
     fun loadDemo() = viewModelScope.launch {

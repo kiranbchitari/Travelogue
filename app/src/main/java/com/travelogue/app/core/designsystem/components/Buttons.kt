@@ -23,8 +23,8 @@ import com.travelogue.app.core.designsystem.theme.Shapes
 import com.travelogue.app.core.designsystem.theme.Travel
 
 /**
- * Main call to action: a flat block of ink with a faint top sheen. No gradient, no glow. The label
- * is set in the house lowercase voice.
+ * Main call to action: a flat block of the theme's accent (ink, in the classic look) with a faint
+ * top sheen. The label is set in the house lowercase voice.
  */
 @Composable
 fun PrimaryButton(
@@ -41,8 +41,8 @@ fun PrimaryButton(
         modifier
             .alpha(if (enabled) 1f else 0.4f)
             .pressable(if (enabled && !loading) onClick else null)
-            .shadow(if (c.isDark) 0.dp else 8.dp, Shapes.sm, spotColor = Color(0x40000000), ambientColor = Color(0x14000000))
-            .clip(Shapes.sm)
+            .shadow(if (c.isDark) 0.dp else 8.dp, Shapes.button, spotColor = Color(0x40000000), ambientColor = Color(0x14000000))
+            .clip(Shapes.button)
             .background(brush)
             .heightIn(min = 54.dp)
             .padding(horizontal = 24.dp),
@@ -75,9 +75,9 @@ fun SecondaryButton(
         modifier
             .alpha(if (enabled) 1f else 0.4f)
             .pressable(if (enabled) onClick else null)
-            .clip(Shapes.sm)
+            .clip(Shapes.button)
             .background(background)
-            .border(1.dp, if (color == Travel.colors.ink) Travel.colors.line else color.copy(alpha = 0.28f), Shapes.sm)
+            .border(1.dp, if (color == Travel.colors.ink) Travel.colors.line else color.copy(alpha = 0.28f), Shapes.button)
             .heightIn(min = 48.dp)
             .padding(horizontal = 20.dp),
         horizontalArrangement = Arrangement.Center,

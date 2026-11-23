@@ -4,6 +4,7 @@ import android.content.Context
 import android.net.Uri
 import androidx.room.withTransaction
 import com.travelogue.app.BuildConfig
+import com.travelogue.app.core.designsystem.theme.AppTheme
 import com.travelogue.app.core.designsystem.theme.ThemeMode
 import com.travelogue.app.core.storage.MediaStorage
 import com.travelogue.app.core.storage.StorageFullException
@@ -91,6 +92,7 @@ class BackupManager(
         val settingsArchive = SettingsArchive(
             defaultCurrency = s.defaultCurrency,
             themeMode = s.themeMode.name,
+            appTheme = s.theme.name,
             travellers = snap.travellers,
             categories = snap.categories,
             exchangeRates = s.exchangeRates.map { SettingsRepository.encodeRates(listOf(it)) },
@@ -675,6 +677,8 @@ class BackupManager(
         s.categories.forEach { c -> if (c.name.isNotBlank() && db.expenseDao().findCategory(c.name) == null) db.expenseDao().insertCategory(c.copy(id = 0)) }
         settings.setDefaultCurrency(s.defaultCurrency)
         settings.setTheme(enumOr(s.themeMode, ThemeMode.SYSTEM))
+        // Older backups have no look, and a newer app may name one this version lacks: keep the current one.
+        AppTheme.entries.firstOrNull { it.name == s.appTheme }?.let { settings.setAppTheme(it) }
         SettingsRepository.decodeRates(s.exchangeRates.joinToString(";")).forEach { settings.setExchangeRate(it.from, it.to, it.rate) }
         s.holidayPrefs?.let { p ->
             val current = settings.holidayPrefs.first()

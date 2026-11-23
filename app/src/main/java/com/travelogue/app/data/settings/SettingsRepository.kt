@@ -5,6 +5,7 @@ import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
+import com.travelogue.app.core.designsystem.theme.AppTheme
 import com.travelogue.app.core.designsystem.theme.ThemeMode
 import com.travelogue.app.data.backup.BackupHistory
 import com.travelogue.app.data.backup.BackupJson
@@ -22,6 +23,8 @@ private val Context.dataStore by preferencesDataStore(name = "settings")
 
 data class AppSettings(
     val themeMode: ThemeMode = ThemeMode.SYSTEM,
+    /** The look chosen in Settings → Appearance. */
+    val theme: AppTheme = AppTheme.CLASSIC,
     val defaultCurrency: String = "INR",
     val demoLoaded: Boolean = false,
     /** Manual rates used to bring every trip into the default currency (Settings → Exchange rates). */
@@ -31,6 +34,7 @@ data class AppSettings(
 class SettingsRepository(private val context: Context) {
     private object Keys {
         val theme = stringPreferencesKey("theme_mode")
+        val look = stringPreferencesKey("app_theme")
         val currency = stringPreferencesKey("default_currency")
         val demo = booleanPreferencesKey("demo_loaded")
         val rates = stringPreferencesKey("exchange_rates")
@@ -47,6 +51,7 @@ class SettingsRepository(private val context: Context) {
     val settings: Flow<AppSettings> = context.dataStore.data.map { p ->
         AppSettings(
             themeMode = enumOr(p[Keys.theme], ThemeMode.SYSTEM),
+            theme = enumOr(p[Keys.look], AppTheme.CLASSIC),
             defaultCurrency = p[Keys.currency] ?: "INR",
             demoLoaded = p[Keys.demo] ?: false,
             exchangeRates = decodeRates(p[Keys.rates]),
@@ -77,6 +82,7 @@ class SettingsRepository(private val context: Context) {
     }
 
     suspend fun setTheme(mode: ThemeMode) { context.dataStore.edit { it[Keys.theme] = mode.name } }
+    suspend fun setAppTheme(theme: AppTheme) { context.dataStore.edit { it[Keys.look] = theme.name } }
     suspend fun setDefaultCurrency(code: String) { context.dataStore.edit { it[Keys.currency] = code.uppercase() } }
     suspend fun setDemoLoaded(v: Boolean) { context.dataStore.edit { it[Keys.demo] = v } }
     /** Ids of travellers that loading the sample trips created (as opposed to ones that already existed). */

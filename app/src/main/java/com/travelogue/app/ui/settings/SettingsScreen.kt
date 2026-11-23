@@ -23,7 +23,18 @@ import androidx.compose.ui.window.DialogProperties
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.travelogue.app.BuildConfig
 import com.travelogue.app.core.designsystem.components.*
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.foundation.border
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.unit.sp
+import com.travelogue.app.core.designsystem.theme.AppTheme
 import com.travelogue.app.core.designsystem.theme.Shapes
+import com.travelogue.app.core.designsystem.theme.travelTypography
 import com.travelogue.app.core.designsystem.theme.Space
 import com.travelogue.app.core.designsystem.theme.ThemeMode
 import com.travelogue.app.core.designsystem.theme.Travel
@@ -54,15 +65,27 @@ fun SettingsScreen(nav: Nav) {
     LaunchedEffect(Unit) { vm.message.collect { Toast.makeText(context, it, Toast.LENGTH_LONG).show() } }
 
     LazyColumn(
-        Modifier.fillMaxSize().background(Travel.colors.background),
+        Modifier.fillMaxSize(),
         contentPadding = tabContentPadding(),
         verticalArrangement = Arrangement.spacedBy(Space.xxl),
     ) {
         item { LargeHeader("Your journal", "Settings") }
 
         item {
+            Column {
+                Overline("Theme", Modifier.padding(start = Space.gutter + 4.dp, bottom = Space.sm))
+                ThemePicker(settings.theme, dark = Travel.colors.isDark, onSelect = vm::setAppTheme)
+                Text(
+                    "${settings.theme.title} is on. Your choice is saved on this phone.",
+                    style = Travel.type.bodySmall, color = Travel.colors.inkFaint,
+                    modifier = Modifier.padding(start = Space.gutter + 4.dp, end = Space.gutter, top = Space.sm),
+                )
+            }
+        }
+
+        item {
             SettingsGroup("Appearance") {
-                Text("Theme", style = Travel.type.body, color = Travel.colors.inkSoft, modifier = Modifier.padding(bottom = Space.sm))
+                Text("Brightness", style = Travel.type.body, color = Travel.colors.inkSoft, modifier = Modifier.padding(bottom = Space.sm))
                 Row(horizontalArrangement = Arrangement.spacedBy(Space.sm)) {
                     listOf(ThemeMode.SYSTEM to "System", ThemeMode.LIGHT to "Light", ThemeMode.DARK to "Dark").forEach { (m, l) ->
                         ChoicePill(
@@ -147,6 +170,48 @@ fun SettingsScreen(nav: Nav) {
         ConfirmDialog("Remove sample trips?", "The three demo trips and their photos will be deleted. Your own trips are not affected.", "Remove", vm::removeDemo, { confirmDemoRemove = false })
     }
     if (confirmClear) ClearDataDialog(onConfirm = vm::clearAll, onDismiss = { confirmClear = false })
+}
+
+/** One preview card per theme, each drawn in that theme's own colours, shapes and scenery. */
+@Composable
+private fun ThemePicker(selected: AppTheme, dark: Boolean, onSelect: (AppTheme) -> Unit) {
+    LazyRow(contentPadding = PaddingValues(horizontal = Space.gutter), horizontalArrangement = Arrangement.spacedBy(Space.md)) {
+        items(AppTheme.entries, key = { it.name }) { theme -> ThemeCard(theme, dark, theme == selected) { onSelect(theme) } }
+    }
+}
+
+@Composable
+private fun ThemeCard(theme: AppTheme, dark: Boolean, selected: Boolean, onClick: () -> Unit) {
+    val c = theme.colors(dark)
+    val shape = theme.shapes.lg
+    val edge by animateColorAsState(if (selected) c.accent else c.line, label = "themeEdge")
+    Column(
+        Modifier
+            .width(158.dp)
+            .pressable(onClick)
+            .semantics { this.selected = selected; role = Role.RadioButton }
+            .clip(shape)
+            .background(c.card)
+            .border(if (selected) 2.dp else 1.dp, edge, shape),
+    ) {
+        Box(Modifier.fillMaxWidth().height(104.dp)) {
+            SceneArt(Modifier.matchParentSize(), theme = theme, dark = dark)
+            if (selected) {
+                Box(Modifier.align(Alignment.TopEnd).padding(Space.sm).size(26.dp).clip(CircleShape).background(c.accent), contentAlignment = Alignment.Center) {
+                    Icon(Icons.Rounded.Check, "Selected", tint = c.onAccent, modifier = Modifier.size(16.dp))
+                }
+            }
+        }
+        Column(Modifier.padding(horizontal = Space.md, vertical = Space.md)) {
+            Text(theme.title.voice(), style = travelTypography(theme.flavour).titleSmall.copy(fontFamily = travelTypography(theme.flavour).title.fontFamily, fontSize = 17.sp), color = c.ink, maxLines = 1)
+            Spacer(Modifier.height(2.dp))
+            Text(theme.tagline, style = Travel.type.bodySmall, color = c.inkSoft, minLines = 2, maxLines = 2)
+            Spacer(Modifier.height(Space.sm))
+            Row(horizontalArrangement = Arrangement.spacedBy(5.dp)) {
+                listOf(c.accent, c.gold, c.secondary, c.bar).forEach { Box(Modifier.size(14.dp).clip(CircleShape).background(it)) }
+            }
+        }
+    }
 }
 
 @Composable

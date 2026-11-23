@@ -21,6 +21,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.travelogue.app.core.designsystem.theme.Scenery
 import com.travelogue.app.core.designsystem.theme.Shapes
 import com.travelogue.app.core.designsystem.theme.Space
 import com.travelogue.app.core.designsystem.theme.Travel
@@ -42,8 +43,9 @@ fun ScreenScaffold(
     content: @Composable (PaddingValues) -> Unit,
 ) {
     Scaffold(
-        modifier = modifier,
-        containerColor = Travel.colors.background,
+        modifier = modifier.travelBackdrop(),
+        containerColor = Color.Transparent,
+        contentColor = Travel.colors.ink,
         contentWindowInsets = WindowInsets.safeDrawing,
         topBar = { TopBar(title = title, subtitle = subtitle, onBack = onBack, actions = actions) },
         floatingActionButton = floatingAction,
@@ -64,7 +66,7 @@ fun TopBar(
     Row(
         modifier
             .fillMaxWidth()
-            .background(Travel.colors.background)
+            .travelBackdrop()
             .windowInsetsPadding(WindowInsets.statusBars)
             .padding(horizontal = Space.lg, vertical = Space.sm)
             .heightIn(min = 56.dp),
@@ -76,7 +78,7 @@ fun TopBar(
         }
         Column(Modifier.weight(1f)) {
             Text(title.voice(), style = Travel.type.title, color = Travel.colors.ink, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            if (subtitle != null) Text(subtitle, style = Travel.type.bodySmall, color = Travel.colors.inkFaint, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            if (subtitle != null) Text(subtitle, style = Travel.type.bodySmall, color = if (Travel.theme.hasBackdrop) Travel.colors.inkSoft else Travel.colors.inkFaint, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
         Row(horizontalArrangement = Arrangement.spacedBy(Space.sm), verticalAlignment = Alignment.CenterVertically, content = actions)
     }
@@ -95,7 +97,8 @@ fun LargeHeader(
         verticalAlignment = Alignment.Bottom,
     ) {
         Column(Modifier.weight(1f)) {
-            Overline(overline)
+            // Over scenery the faintest ink is too weak to read.
+            Overline(overline, color = if (Travel.theme.hasBackdrop) Travel.colors.inkSoft else Travel.colors.inkFaint)
             Spacer(Modifier.height(6.dp))
             Text(title.voice(), style = Travel.type.display, color = Travel.colors.ink)
         }
@@ -124,8 +127,8 @@ fun OverflowMenu(items: List<MenuItem>, modifier: Modifier = Modifier, backgroun
 }
 
 /**
- * Quiet empty state: an ink disc inside hairline rings. Every list in the app uses this rather
- * than a blank screen.
+ * Empty state: the icon on a disc, set in a round window onto the theme's scenery (or inside
+ * hairline rings in the classic look). Every list in the app uses this rather than a blank screen.
  */
 @Composable
 fun EmptyState(
@@ -138,12 +141,24 @@ fun EmptyState(
 ) {
     val c = Travel.colors
     Column(modifier.fillMaxWidth().padding(horizontal = Space.xxxl, vertical = Space.huge), horizontalAlignment = Alignment.CenterHorizontally) {
-        // Concentric hairline rings around a solid ink disc.
-        Box(contentAlignment = Alignment.Center) {
-            Box(Modifier.size(136.dp).border(1.dp, c.line.copy(alpha = 0.6f), CircleShape))
-            Box(Modifier.size(104.dp).border(1.dp, c.line, CircleShape))
-            Box(Modifier.size(72.dp).clip(CircleShape).background(c.accent), contentAlignment = Alignment.Center) {
-                Icon(icon, null, tint = c.onAccent, modifier = Modifier.size(30.dp))
+        if (Travel.theme.scenery == Scenery.RINGS) {
+            // Concentric hairline rings around a solid ink disc.
+            Box(contentAlignment = Alignment.Center) {
+                Box(Modifier.size(136.dp).border(1.dp, c.line.copy(alpha = 0.6f), CircleShape))
+                Box(Modifier.size(104.dp).border(1.dp, c.line, CircleShape))
+                Box(Modifier.size(72.dp).clip(CircleShape).background(c.accent), contentAlignment = Alignment.Center) {
+                    Icon(icon, null, tint = c.onAccent, modifier = Modifier.size(30.dp))
+                }
+            }
+        } else {
+            Box(Modifier.size(width = 156.dp, height = 150.dp)) {
+                SceneArt(Modifier.align(Alignment.TopCenter).size(140.dp).clip(CircleShape).border(4.dp, c.card, CircleShape))
+                Box(
+                    Modifier.align(Alignment.BottomEnd).size(60.dp).clip(CircleShape).background(c.background).padding(4.dp).clip(CircleShape).background(c.accent),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(icon, null, tint = c.onAccent, modifier = Modifier.size(26.dp))
+                }
             }
         }
         Spacer(Modifier.height(Space.xxl))
@@ -160,7 +175,7 @@ fun EmptyState(
 @Composable
 fun LoadingState(modifier: Modifier = Modifier) {
     Box(modifier.fillMaxWidth().padding(Space.huge), contentAlignment = Alignment.Center) {
-        CircularProgressIndicator(color = Travel.colors.ink, strokeWidth = 1.5.dp, modifier = Modifier.size(28.dp))
+        CircularProgressIndicator(color = Travel.colors.accent, strokeWidth = 1.5.dp, modifier = Modifier.size(28.dp))
     }
 }
 

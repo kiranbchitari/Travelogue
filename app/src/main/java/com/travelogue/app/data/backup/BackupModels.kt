@@ -71,6 +71,8 @@ data class TripArchive(
 data class SettingsArchive(
     val defaultCurrency: String = "INR",
     val themeMode: String = "SYSTEM",
+    /** The chosen look (an AppTheme name); absent in backups made before themes existed. */
+    val appTheme: String? = null,
     val travellers: List<TravellerEntity> = emptyList(),
     val categories: List<ExpenseCategoryEntity> = emptyList(),
     /** "EUR>INR=92.5" entries (Settings → Exchange rates). */

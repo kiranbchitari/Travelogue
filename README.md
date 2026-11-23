@@ -33,7 +33,7 @@ minSdk 26, targetSdk 36, compileSdk 37.
 
 | Package | What lives there |
 |---|---|
-| `core/designsystem` | Theme (monochrome ink-on-white palette with a near-black dark mode, Fraunces + Plus Jakarta Sans), spacing/shapes, reusable components, hand-drawn interactive charts |
+| `core/designsystem` | Six selectable themes (the monochrome ink-on-white original plus Beach day, Mountain air, Golden hour, Postcard and Carnival), each with light and dark colours, its own corner shapes, lettering and Canvas-drawn scenery (`Themes.kt`, `Scenery.kt`); Fraunces + Plus Jakarta Sans, spacing, reusable components, hand-drawn interactive charts |
 | `core/storage` | `MediaStorage`: copies picked photos and documents into app-private storage (downscaled JPEG), checks free space, reports usage |
 | `core/util` | Formatting (money, dates) and Android intents (call, SMS, WhatsApp, maps links, open file) |
 | `data/db` | Room entities, DAOs, converters, `AppDatabase` (explicit migrations only) |

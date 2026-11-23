@@ -12,14 +12,14 @@ import androidx.compose.runtime.ReadOnlyComposable
 enum class ThemeMode { SYSTEM, LIGHT, DARK }
 
 @Composable
-fun TravelogueTheme(mode: ThemeMode = ThemeMode.SYSTEM, content: @Composable () -> Unit) {
+fun TravelogueTheme(mode: ThemeMode = ThemeMode.SYSTEM, theme: AppTheme = AppTheme.CLASSIC, content: @Composable () -> Unit) {
     val dark = when (mode) {
         ThemeMode.SYSTEM -> isSystemInDarkTheme()
         ThemeMode.LIGHT -> false
         ThemeMode.DARK -> true
     }
-    val c = if (dark) DarkTravelColors else LightTravelColors
-    val t = DefaultTravelTypography
+    val c = theme.colors(dark)
+    val t = travelTypography(theme.flavour)
 
     val scheme = if (dark) {
         darkColorScheme(
@@ -48,15 +48,22 @@ fun TravelogueTheme(mode: ThemeMode = ThemeMode.SYSTEM, content: @Composable () 
         bodyLarge = t.bodyLarge, bodyMedium = t.body, bodySmall = t.bodySmall,
         labelLarge = t.label, labelMedium = t.label, labelSmall = t.overline,
     )
-    CompositionLocalProvider(LocalTravelColors provides c, LocalTravelTypography provides t) {
+    CompositionLocalProvider(
+        LocalTravelColors provides c,
+        LocalTravelTypography provides t,
+        LocalTravelShapes provides theme.shapes,
+        LocalAppTheme provides theme,
+    ) {
         MaterialTheme(colorScheme = scheme, typography = m3Type, content = content)
     }
 }
 
-/** Shorthand accessors: `Travel.colors.ink`, `Travel.type.title`. */
+/** Shorthand accessors: `Travel.colors.ink`, `Travel.type.title`, `Travel.theme.scenery`. */
 object Travel {
     val colors: TravelColors
         @Composable @ReadOnlyComposable get() = LocalTravelColors.current
     val type: TravelTypography
         @Composable @ReadOnlyComposable get() = LocalTravelTypography.current
+    val theme: AppTheme
+        @Composable @ReadOnlyComposable get() = LocalAppTheme.current
 }

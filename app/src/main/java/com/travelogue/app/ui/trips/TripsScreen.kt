@@ -49,7 +49,7 @@ fun TripsScreen(nav: Nav) {
                             CircleIconButton(Icons.Rounded.FileOpen, importBackup, contentDescription = "Import trip")
                             CircleIconButton(
                                 Icons.Rounded.Add, nav::newTrip, contentDescription = "New trip",
-                                background = Travel.colors.ink, tint = Travel.colors.background,
+                                background = Travel.colors.accent, tint = Travel.colors.onAccent,
                             )
                         }
                     },

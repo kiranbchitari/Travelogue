@@ -63,6 +63,10 @@ data class TravelColors(
     val success: Color,
     val chart: List<Color>,
     val isDark: Boolean,
+    /** The docked bottom bar: its fill, its icons and labels, and the mark on the current tab. */
+    val bar: Color = Color(0xFF0E0E0E),
+    val onBar: Color = Color.White,
+    val barAccent: Color = Color(0xFFFF7A45),
 )
 
 val LightTravelColors = TravelColors(
@@ -117,6 +121,7 @@ val DarkTravelColors = TravelColors(
         Color(0xFFD08BC0), Color(0xFF8FA7BE), Color(0xFFF29AB0), Color(0xFFD1BA98), Color(0xFF6CCFCB), Color(0xFF8E8E8E),
     ),
     isDark = true,
+    bar = Color(0xFF101010),
 )
 
 val LocalTravelColors = staticCompositionLocalOf { LightTravelColors }

@@ -79,7 +79,7 @@ private fun DayChip(number: Int, day: ItineraryDayEntity, selected: Boolean, act
             .clickable(onClick = onClick)
             .padding(horizontal = 12.dp, vertical = 12.dp),
     ) {
-        Overline("Day $number", color = if (selected) c.accent else c.inkFaint)
+        Overline("Day $number", color = soft)
         Spacer(Modifier.height(6.dp))
         Text(day.date.format(shortDay), style = Travel.type.titleSmall, color = fg)
         Text(Fmt.dayMonth(day.date), style = Travel.type.bodySmall, color = soft)

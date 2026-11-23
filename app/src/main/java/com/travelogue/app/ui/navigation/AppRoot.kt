@@ -44,6 +44,9 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.toRoute
+import androidx.compose.ui.graphics.luminance
+import com.travelogue.app.core.designsystem.components.travelBackdrop
+import com.travelogue.app.core.designsystem.theme.BarStyle
 import com.travelogue.app.core.designsystem.theme.Shapes
 import com.travelogue.app.core.designsystem.theme.Space
 import com.travelogue.app.core.designsystem.theme.Travel
@@ -94,7 +97,7 @@ fun AppRoot() {
     val dest = entry?.destination
     val currentTab = Tabs.firstOrNull { t -> dest?.hierarchy?.any { it.hasRoute(t.route::class) } == true }
 
-    Box(Modifier.fillMaxSize().background(Travel.colors.background)) {
+    Box(Modifier.fillMaxSize().travelBackdrop()) {
         NavHost(
             navController = controller,
             startDestination = HomeRoute,
@@ -148,7 +151,7 @@ fun AppRoot() {
                     .align(Alignment.TopCenter)
                     .fillMaxWidth()
                     .windowInsetsTopHeight(WindowInsets.statusBars)
-                    .background(Travel.colors.background),
+                    .travelBackdrop(),
             )
         }
 
@@ -160,14 +163,15 @@ fun AppRoot() {
         ) {
             DockedBottomBar(current = currentTab, onSelect = { nav.tab(it.route) })
         }
-        NavBarIcons(lightIcons = currentTab != null || Travel.colors.isDark)
+        NavBarIcons(lightIcons = (currentTab != null && Travel.colors.bar.luminance() < 0.5f) || Travel.colors.isDark)
         BackupHost()
     }
 }
 
 /**
- * Docked ink bar. Each tab is an icon over a tracked micro-label; the current one is lit and sits
- * under a short ember rule. The bar stays ink in both themes.
+ * Docked bar in the theme's deepest colour (ink in the classic look), dark in both light and dark
+ * mode. Each tab is an icon over a tracked micro-label. The current one is lit and marked the way
+ * the theme asks: under a short rule, or with a bright pill behind its icon.
  */
 @Composable
 private fun DockedBottomBar(current: TabItem?, onSelect: (TabItem) -> Unit) {
@@ -178,7 +182,7 @@ private fun DockedBottomBar(current: TabItem?, onSelect: (TabItem) -> Unit) {
             .fillMaxWidth()
             .shadow(if (c.isDark) 0.dp else 24.dp, shape, ambientColor = Color(0x33000000), spotColor = Color(0x55000000))
             .clip(shape)
-            .background(if (c.isDark) Color(0xFF101010) else Color(0xFF0E0E0E))
+            .background(c.bar)
             .border(1.dp, Color.White.copy(alpha = if (c.isDark) 0.08f else 0f), shape)
             .navigationBarsPadding()
             .height(66.dp)
@@ -187,8 +191,11 @@ private fun DockedBottomBar(current: TabItem?, onSelect: (TabItem) -> Unit) {
     ) {
         Tabs.forEach { tab ->
             val selected = tab == current
-            val tint by animateColorAsState(if (selected) Color.White else Color.White.copy(alpha = 0.42f), label = "tabTint")
-            val rule by animateDpAsState(if (selected) 18.dp else 0.dp, label = "tabRule")
+            val pill = Travel.theme.barStyle == BarStyle.PILL
+            val tint by animateColorAsState(if (selected) c.onBar else c.onBar.copy(alpha = 0.5f), label = "tabTint")
+            val iconTint by animateColorAsState(if (selected && pill) c.bar else tint, label = "tabIcon")
+            val pillColor by animateColorAsState(if (selected && pill) c.barAccent else c.barAccent.copy(alpha = 0f), label = "tabPill")
+            val rule by animateDpAsState(if (selected && !pill) 18.dp else 0.dp, label = "tabRule")
             Column(
                 Modifier
                     .weight(1f)
@@ -196,10 +203,12 @@ private fun DockedBottomBar(current: TabItem?, onSelect: (TabItem) -> Unit) {
                     .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) { onSelect(tab) },
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
-                Box(Modifier.width(rule).height(2.dp).clip(Shapes.pill).background(Color(0xFFFF7A45)))
+                Box(Modifier.width(rule).height(2.dp).clip(Shapes.pill).background(c.barAccent))
                 Spacer(Modifier.weight(1f))
-                Icon(if (selected) tab.selectedIcon else tab.icon, contentDescription = tab.label, tint = tint, modifier = Modifier.size(22.dp))
-                Spacer(Modifier.height(5.dp))
+                Box(Modifier.clip(Shapes.pill).background(pillColor).padding(horizontal = if (pill) 16.dp else 0.dp, vertical = if (pill) 4.dp else 0.dp)) {
+                    Icon(if (selected) tab.selectedIcon else tab.icon, contentDescription = tab.label, tint = iconTint, modifier = Modifier.size(22.dp))
+                }
+                Spacer(Modifier.height(if (pill) 3.dp else 5.dp))
                 Text(
                     tab.label.uppercase(),
                     style = Travel.type.overline.copy(fontSize = 9.sp, letterSpacing = 0.12.em),
@@ -212,7 +221,7 @@ private fun DockedBottomBar(current: TabItem?, onSelect: (TabItem) -> Unit) {
     }
 }
 
-/** The bar is ink even in the light theme, so the system navigation icons over it must be light. */
+/** The bar is dark even in light mode, so the system navigation icons over it must be light. */
 @Composable
 private fun NavBarIcons(lightIcons: Boolean) {
     val view = LocalView.current

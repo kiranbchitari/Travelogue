@@ -106,6 +106,7 @@ fun SectionHeader(
     Row(modifier.fillMaxWidth(), verticalAlignment = Alignment.Bottom) {
         Column(Modifier.weight(1f)) {
             Text(title.voice(), style = Travel.type.title, color = Travel.colors.ink)
+            ThemeFlourish(Modifier.padding(top = 5.dp, bottom = 3.dp).size(width = 34.dp, height = 7.dp))
             if (subtitle != null) {
                 Spacer(Modifier.height(2.dp))
                 Text(subtitle, style = Travel.type.bodySmall, color = Travel.colors.inkFaint)
@@ -116,9 +117,9 @@ fun SectionHeader(
                 Modifier.clip(Shapes.pill).clickable(onClick = onAction).padding(horizontal = 8.dp, vertical = 4.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Text(actionLabel.uppercase(), style = Travel.type.overline, color = Travel.colors.ink)
+                Text(actionLabel.uppercase(), style = Travel.type.overline, color = Travel.colors.accent)
                 Spacer(Modifier.width(6.dp))
-                Icon(Icons.AutoMirrored.Rounded.ArrowForward, null, tint = Travel.colors.ink, modifier = Modifier.size(13.dp))
+                Icon(Icons.AutoMirrored.Rounded.ArrowForward, null, tint = Travel.colors.accent, modifier = Modifier.size(13.dp))
             }
         }
     }
@@ -215,9 +216,9 @@ fun ChoicePill(
     leadingDot: Color? = null,
 ) {
     val c = Travel.colors
-    val bg by animateColorAsState(if (selected) c.ink else c.card, label = "pillBg")
+    val bg by animateColorAsState(if (selected) c.accent else c.card, label = "pillBg")
     val fg by animateColorAsState(if (selected) c.onAccent else c.inkSoft, label = "pillFg")
-    val edge by animateColorAsState(if (selected) c.ink else c.line, label = "pillEdge")
+    val edge by animateColorAsState(if (selected) c.accent else c.line, label = "pillEdge")
     Row(
         modifier
             .clip(Shapes.pill)

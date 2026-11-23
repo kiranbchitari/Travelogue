@@ -37,6 +37,7 @@ import coil3.request.ImageRequest
 import coil3.request.crossfade
 import com.travelogue.app.core.designsystem.theme.Shapes
 import com.travelogue.app.core.designsystem.theme.Space
+import com.travelogue.app.core.designsystem.theme.Scenery
 import com.travelogue.app.core.designsystem.theme.Travel
 import com.travelogue.app.data.db.entity.TripPhotoEntity
 import java.io.File
@@ -93,9 +94,16 @@ private val ArtPalettes = listOf(
     listOf(Color(0xFFA6B8D0), Color(0xFF3A4F73), Color(0xFF10182A)),
 )
 
-/** Deterministic dusk illustration used where a photo is missing. */
+/**
+ * Deterministic illustration used where a photo is missing: the current theme's scenery, or a dusk
+ * landscape in the classic look. The same [seed] always gives the same picture.
+ */
 @Composable
 fun GradientArt(seed: String, modifier: Modifier = Modifier) {
+    if (Travel.theme.scenery != Scenery.RINGS) {
+        SceneArt(modifier, seed = abs(seed.hashCode() % 1000))
+        return
+    }
     val idx = abs(seed.hashCode()) % ArtPalettes.size
     val p = ArtPalettes[idx]
     val sunX = 0.25f + (abs(seed.hashCode() / 7) % 50) / 100f
