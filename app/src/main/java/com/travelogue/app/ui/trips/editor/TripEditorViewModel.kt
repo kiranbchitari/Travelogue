@@ -87,7 +87,7 @@ class TripEditorViewModel(
         "name" to name, "destination" to destination, "country" to country, "startDate" to startDate, "endDate" to endDate,
         "travellerCount" to travellerCount, "travellerNames" to ArrayList(travellerNames), "description" to description, "notes" to notes,
         "status" to status, "statusTouched" to statusTouched, "budget" to budget, "currency" to currency, "travelType" to travelType,
-        "removeCover" to removeCover,
+        "removeCover" to removeCover, "pendingCover" to pendingCover,
         "coverX" to coverFrame.x, "coverY" to coverFrame.y, "coverZoom" to coverFrame.zoom,
     )
 
@@ -100,7 +100,11 @@ class TripEditorViewModel(
         status = b.read("status") ?: status; statusTouched = b.getBoolean("statusTouched", statusTouched)
         budget = b.read("budget") ?: budget; currency = b.read("currency") ?: currency; travelType = b.read("travelType") ?: travelType
         if (b.getBoolean("removeCover")) { removeCover = true; savedCoverPath = null }
-        if (b.containsKey("coverX")) coverFrame = CoverFrame.of(b.getFloat("coverX"), b.getFloat("coverY"), b.getFloat("coverZoom"))
+        // The framing belongs to the photo it was chosen for. A photo picked but not yet saved comes back
+        // only if it can still be read; if not, its framing is dropped and the saved cover keeps its own.
+        val picked = b.read<Uri>("pendingCover")
+        val frameFitsPhoto = picked == null || c.media.canRead(picked).also { if (it) { pendingCover = picked; removeCover = false } }
+        if (frameFitsPhoto && b.containsKey("coverX")) coverFrame = CoverFrame.of(b.getFloat("coverX"), b.getFloat("coverY"), b.getFloat("coverZoom"))
     }
 
     init {

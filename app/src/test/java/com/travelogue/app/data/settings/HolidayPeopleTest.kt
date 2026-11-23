@@ -4,7 +4,11 @@ import com.travelogue.app.data.backup.BackupJson
 import com.travelogue.app.data.backup.HolidayPersonArchive
 import com.travelogue.app.data.backup.SettingsArchive
 import com.travelogue.app.data.backup.TripArchive
+import com.travelogue.app.data.backup.allHolidays
+import com.travelogue.app.data.backup.withHolidays
+import com.travelogue.app.data.db.entity.HolidayEntity
 import com.travelogue.app.data.db.entity.TripEntity
+import kotlinx.serialization.Serializable
 import com.travelogue.app.domain.HolidayPerson
 import com.travelogue.app.domain.HolidayPrefs
 import org.junit.Assert.assertEquals
@@ -64,14 +68,36 @@ class HolidayPeopleTest {
 
     @Test fun aNewBackupCarriesAddedPeopleAndTheirDays() {
         val mum = HolidayPerson("a1b2c3d4", "Mum", setOf(DayOfWeek.SUNDAY))
+        val christmas = HolidayEntity(mum.id, LocalDate.of(2026, 12, 25), "Christmas", 1)
         val archive = SettingsArchive(
-            holidays = listOf(com.travelogue.app.data.db.entity.HolidayEntity(mum.id, LocalDate.of(2026, 12, 25), "Christmas", 1)),
             holidayPrefs = com.travelogue.app.data.backup.HolidayPrefsArchive("Kiran", "Asha", extras = listOf(SettingsRepository.archive(mum))),
-        )
+        ).withHolidays(listOf(christmas))
         val back = BackupJson.decodeFromString(SettingsArchive.serializer(), BackupJson.encodeToString(SettingsArchive.serializer(), archive))
         assertEquals(archive, back)
+        assertEquals(listOf(christmas), back.allHolidays)
         assertEquals(listOf(mum), SettingsRepository.toPeople(back.holidayPrefs!!.extras))
     }
+
+    @Test fun version100CanStillReadANewBackup() {
+        val day = LocalDate.of(2026, 11, 6)
+        val archive = SettingsArchive().withHolidays(
+            listOf(
+                HolidayEntity(HolidayPerson.ME, day, "Diwali", 1),
+                HolidayEntity(HolidayPerson.PARTNER, day, "", 2),
+                HolidayEntity("a1b2c3d4", day, "Mum's day", 3),
+            ),
+        )
+        // Only the first two people's days are where 1.0.0 looks; the added person's are kept apart.
+        assertEquals(listOf(HolidayPerson.ME, HolidayPerson.PARTNER), archive.holidays.map { it.owner })
+        assertEquals(listOf("a1b2c3d4"), archive.peopleHolidays.map { it.owner })
+        val old = BackupJson.decodeFromString(V100Settings.serializer(), BackupJson.encodeToString(SettingsArchive.serializer(), archive))
+        assertEquals(listOf(V100Owner.ME, V100Owner.PARTNER), old.holidays.map { it.owner })
+    }
+
+    /** settings.json as version 1.0.0 reads it: owner is a two-value enum with no fallback. */
+    @Serializable private enum class V100Owner { ME, PARTNER }
+    @Serializable private data class V100Holiday(val owner: V100Owner, val date: String, val label: String = "")
+    @Serializable private data class V100Settings(val holidays: List<V100Holiday> = emptyList())
 
     // ---- Export then import ----
 

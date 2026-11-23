@@ -98,42 +98,74 @@ object BackupController {
         if ((_state.value as? BackupUiState.Working)?.canHide == true) _hidden.value = true
     }
 
+    /** The spinner shown while Google sign-in is in flight; the Drive job that follows takes it over. */
+    private var connectingState: BackupUiState.Working? = null
+
+    /**
+     * True when a job is running. Its progress dialog is brought back if it was hidden, so a tap
+     * that can't start anything still shows the user why.
+     */
+    fun revealIfBusy(): Boolean {
+        if (_state.value !is BackupUiState.Working) return false
+        _hidden.value = false
+        return true
+    }
+
+    /**
+     * Claims the runner for a new job, on the tap rather than when its coroutine starts. Only one job
+     * runs at a time: they all report through [state], so a second one would overwrite the first's
+     * dialogs (an import preview, the Drive picker) with its progress. Returns false, showing the
+     * running job, when another is already going. With [handover] a Drive job may take over from the
+     * "Connecting" spinner its own sign-in put up.
+     */
+    private fun claim(title: String, canHide: Boolean = false, handover: Boolean = false): Boolean {
+        val current = _state.value
+        if (current is BackupUiState.Working && !(handover && current === connectingState)) {
+            _hidden.value = false
+            return false
+        }
+        connectingState = null
+        _hidden.value = false
+        _state.value = BackupUiState.Working(title, 0f, "Starting…", canHide = canHide)
+        return true
+    }
+
     fun dismiss() {
         (state.value as? BackupUiState.Preview)?.let { /* session discarded by caller */ }
         _state.value = BackupUiState.Idle
     }
 
-    fun exportTrip(c: AppContainer, tripId: Long, uri: Uri) = c.appScope.launch {
-        run("Exporting trip", canHide = true) {
+    fun exportTrip(c: AppContainer, tripId: Long, uri: Uri) {
+        if (!claim("Exporting trip", canHide = true)) return
+        c.appScope.launch { run {
             val r = c.backup.exportTrip(tripId, uri) { f, m -> _state.value = BackupUiState.Working("Exporting trip", f, m, canHide = true) }
             val extra = if (r.missingFiles > 0) "\n${r.missingFiles} missing file(s) were skipped." else ""
             BackupUiState.Done("Trip exported", "Saved the trip with ${if (r.files == 1) "1 file" else "${r.files} files"} (${Fmt.bytes(r.bytes)}).$extra")
-        }
+        } }
     }
 
-    fun exportAll(c: AppContainer, uri: Uri) = c.appScope.launch {
-        run("Saving backup", canHide = true) {
+    fun exportAll(c: AppContainer, uri: Uri) {
+        if (!claim("Saving backup", canHide = true)) return
+        c.appScope.launch { run {
             val r = c.backup.exportAll(uri) { f, m -> _state.value = BackupUiState.Working("Saving backup", f, m, canHide = true) }
             val name = c.media.displayName(uri) ?: BackupManager.backupFileName()
             val size = c.media.sizeOf(uri).takeIf { it > 0 } ?: r.bytes
             record(c, r, BackupDestination.FILE, name, size)
             BackupUiState.Done("Backup saved", summary(r, size) + " saved as $name." + missingNote(r))
-        }
+        } }
     }
 
-    fun inspect(c: AppContainer, uri: Uri) = c.appScope.launch {
-        run("Checking archive") {
+    fun inspect(c: AppContainer, uri: Uri) {
+        if (!claim("Checking archive")) return
+        c.appScope.launch { run {
             val session = c.backup.inspect(uri) { f, m -> _state.value = BackupUiState.Working("Checking archive", f, m) }
             BackupUiState.Preview(session)
-        }
+        } }
     }
 
     fun import(c: AppContainer, session: BackupManager.ImportSession, strategy: DuplicateStrategy) {
-        // Claimed here, on the tap, not when the coroutine starts: a second tap on Import or Retry
-        // must not start another import of the same (by then deleted) archive.
-        if (_state.value is BackupUiState.Working) return
-        _hidden.value = false
-        _state.value = BackupUiState.Working("Importing", 0f, "Starting…")
+        // A second tap on Import or Retry must not start another import of the same (by then deleted) archive.
+        if (!claim("Importing")) return
         c.appScope.launch { runImport(c, session, strategy) }
     }
 
@@ -159,7 +191,7 @@ object BackupController {
         if (r.missingFiles > 0) "\n${r.missingFiles} file(s) were already missing from this phone and are not in the backup." else ""
 
     private suspend fun runImport(c: AppContainer, session: BackupManager.ImportSession, strategy: DuplicateStrategy) {
-        run("Importing") {
+        run {
             val r = c.backup.import(session, strategy) { f, m -> _state.value = BackupUiState.Working("Importing", f, m) }
             if (r.isPartial) return@run BackupUiState.PartialImport(r, strategy)
             val parts = buildList {
@@ -185,15 +217,22 @@ object BackupController {
         _state.value = BackupUiState.Idle
     }
 
-    /** Shows a spinner while Google authorization is in flight. */
-    fun connecting() { _state.value = BackupUiState.Working("Google Drive", 0f, "Connecting to your Google account…") }
+    /** Shows a spinner while Google authorization is in flight. False (nothing shown) if another job is running. */
+    fun connecting(): Boolean {
+        if (!claim("Google Drive")) return false
+        val spinner = BackupUiState.Working("Google Drive", 0f, "Connecting to your Google account…")
+        connectingState = spinner
+        _state.value = spinner
+        return true
+    }
 
     fun failed(message: String) { _state.value = BackupUiState.Failed(message) }
 
     /** Writes a full backup to app cache, then uploads it to the "Travelogue Backups" Drive folder. */
-    fun driveBackup(c: AppContainer, context: Context, token: String) = c.appScope.launch {
+    fun driveBackup(c: AppContainer, context: Context, token: String) {
         val title = "Backing up to Drive"
-        run(title, canHide = true) {
+        if (!claim(title, canHide = true, handover = true)) return
+        c.appScope.launch { run {
             val name = BackupManager.backupFileName().removeSuffix(".zip") + "_" + LocalTime.now().format(DateTimeFormatter.ofPattern("HHmm")) + ".zip"
             val temp = File(context.cacheDir, "drive-${UUID.randomUUID()}.zip")
             try {
@@ -215,22 +254,24 @@ object BackupController {
             } finally {
                 temp.delete()
             }
-        }
+        } }
     }
 
     /** Lists the backups in Drive so the user can pick one to restore. */
-    fun driveList(c: AppContainer, token: String) = c.appScope.launch {
-        run("Google Drive") {
+    fun driveList(c: AppContainer, token: String) {
+        if (!claim("Google Drive", handover = true)) return
+        c.appScope.launch { run {
             _state.value = BackupUiState.Working("Google Drive", 0.2f, "Looking for backups…")
             val files = DriveClient(token).list()
             if (files.isEmpty()) BackupUiState.Done("No backups yet", "There are no Travelogue backups in your Google Drive. Use “Back up to Google Drive” first.")
             else BackupUiState.DrivePicker(token, files)
-        }
+        } }
     }
 
     /** Downloads the chosen backup and hands it to the normal import preview. */
-    fun driveRestore(c: AppContainer, context: Context, token: String, file: DriveClient.DriveFile) = c.appScope.launch {
-        run("Downloading backup") {
+    fun driveRestore(c: AppContainer, context: Context, token: String, file: DriveClient.DriveFile) {
+        if (!claim("Downloading backup")) return
+        c.appScope.launch { run {
             val temp = File(context.cacheDir, "drive-${UUID.randomUUID()}.zip")
             try {
                 DriveClient(token).download(file, temp) { f ->
@@ -241,14 +282,13 @@ object BackupController {
             } finally {
                 temp.delete()
             }
-        }
+        } }
     }
 
     private fun daysOff(n: Int) = if (n == 1) "1 day off" else "$n days off"
 
-    private suspend fun run(title: String, canHide: Boolean = false, block: suspend () -> BackupUiState) {
-        _hidden.value = false
-        _state.value = BackupUiState.Working(title, 0f, "Starting…", canHide = canHide)
+    /** Runs a job that [claim] has already started, ending in its result or the error it hit. */
+    private suspend fun run(block: suspend () -> BackupUiState) {
         _state.value = try {
             block()
         } catch (e: BackupException) {
@@ -272,8 +312,11 @@ fun rememberTripExporter(): (tripId: Long, tripName: String) -> Unit {
         if (uri != null && pendingTrip != 0L) BackupController.exportTrip(c, pendingTrip, uri)
     }
     return { id, name ->
-        pendingTrip = id
-        launcher.launch(BackupManager.suggestedFileName(name))
+        // While another job runs, show it rather than asking for a file that can't be used yet.
+        if (!BackupController.revealIfBusy()) {
+            pendingTrip = id
+            launcher.launch(BackupManager.suggestedFileName(name))
+        }
     }
 }
 
@@ -284,7 +327,7 @@ fun rememberFullBackupExporter(): () -> Unit {
     val launcher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/zip")) { uri ->
         if (uri != null) BackupController.exportAll(c, uri)
     }
-    return { launcher.launch(BackupManager.backupFileName()) }
+    return { if (!BackupController.revealIfBusy()) launcher.launch(BackupManager.backupFileName()) }
 }
 
 /**
@@ -297,7 +340,9 @@ fun rememberBackupImporter(): () -> Unit {
     val launcher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri != null) BackupController.inspect(c, uri)
     }
-    return { launcher.launch(arrayOf("application/zip", "application/x-zip-compressed", "application/octet-stream")) }
+    return {
+        if (!BackupController.revealIfBusy()) launcher.launch(arrayOf("application/zip", "application/x-zip-compressed", "application/octet-stream"))
+    }
 }
 
 /** Dialogs for export/import progress, import preview and results. Placed once in AppRoot. */
@@ -397,8 +442,9 @@ fun rememberDriveActions(): DriveActions {
     }
 
     fun start(op: String) {
+        // Another job is running: its dialog is shown again instead of asking Google for access.
+        if (!BackupController.connecting()) return
         pending = op
-        BackupController.connecting()
         val request = AuthorizationRequest.builder().setRequestedScopes(listOf(Scope(DriveClient.SCOPE))).build()
         Identity.getAuthorizationClient(context).authorize(request)
             .addOnSuccessListener { result ->

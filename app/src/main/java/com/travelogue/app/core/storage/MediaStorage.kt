@@ -158,6 +158,10 @@ class MediaStorage(private val context: Context) {
     /** The size the provider reports for [uri], or 0 when it does not say. */
     fun sizeOf(uri: Uri): Long = estimateSize(uri)
 
+    /** Whether [uri] can still be opened; a picker's grant may not outlive the process that got it. */
+    fun canRead(uri: Uri): Boolean =
+        runCatching { context.contentResolver.openFileDescriptor(uri, "r")?.use { true } ?: false }.getOrDefault(false)
+
     private fun estimateSize(uri: Uri): Long = runCatching {
         context.contentResolver.query(uri, arrayOf(OpenableColumns.SIZE), null, null, null)?.use { c ->
             if (c.moveToFirst() && !c.isNull(0)) c.getLong(0) else 0L

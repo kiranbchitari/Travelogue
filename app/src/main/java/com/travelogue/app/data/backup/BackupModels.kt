@@ -1,6 +1,7 @@
 package com.travelogue.app.data.backup
 
 import com.travelogue.app.data.db.entity.*
+import com.travelogue.app.domain.HolidayPerson
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 
@@ -77,8 +78,14 @@ data class SettingsArchive(
     val categories: List<ExpenseCategoryEntity> = emptyList(),
     /** "EUR>INR=92.5" entries (Settings → Exchange rates). */
     val exchangeRates: List<String> = emptyList(),
-    /** Holiday planner: every marked day off, for everyone in it. */
+    /**
+     * Holiday planner: marked days off for the first two people (owner ME or PARTNER) only. Version
+     * 1.0.0 reads owner as a two-value enum and rejects the whole file on anything else, so days off
+     * for added people go in [peopleHolidays], a key it ignores.
+     */
     val holidays: List<HolidayEntity> = emptyList(),
+    /** Marked days off for people added beyond the first two; absent in backups made before they could be. */
+    val peopleHolidays: List<HolidayEntity> = emptyList(),
     /** Holiday planner names and weekly days off; absent in backups made before the planner existed. */
     val holidayPrefs: HolidayPrefsArchive? = null,
 )
@@ -94,6 +101,16 @@ data class HolidayPrefsArchive(
     /** People added beyond the first two; absent in backups made before more could be added. */
     val extras: List<HolidayPersonArchive> = emptyList(),
 )
+
+/** Every marked day off in [SettingsArchive], whichever list it is kept in. */
+val SettingsArchive.allHolidays: List<HolidayEntity> get() = holidays + peopleHolidays
+
+/** The only holiday owners version 1.0.0 can read. */
+private val FirstTwo = setOf(HolidayPerson.ME, HolidayPerson.PARTNER)
+
+/** Puts each of [rows] in the list it belongs in; see [SettingsArchive.holidays]. */
+fun SettingsArchive.withHolidays(rows: List<HolidayEntity>): SettingsArchive =
+    copy(holidays = rows.filter { it.owner in FirstTwo }, peopleHolidays = rows.filter { it.owner !in FirstTwo })
 
 /** An added person in the holiday planner. Also how the list of them is kept in the app's settings. */
 @Serializable

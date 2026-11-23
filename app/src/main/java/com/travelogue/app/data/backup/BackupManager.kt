@@ -95,9 +95,8 @@ class BackupManager(
             travellers = snap.travellers,
             categories = snap.categories,
             exchangeRates = s.exchangeRates.map { SettingsRepository.encodeRates(listOf(it)) },
-            holidays = holidays,
             holidayPrefs = SettingsRepository.archive(holidayPrefs),
-        )
+        ).withHolidays(holidays)
         writeArchive(target, BackupType.FULL, bundles, settingsArchive, progress).copy(holidays = holidays.size, contents = snap.counts)
     }
 
@@ -324,7 +323,7 @@ class BackupManager(
                 counts = counts,
             )
         }
-        val preview = ImportPreview(manifest.type, manifest.exportedAt, previews, manifest.files.size, declaredTotal, settingsArchive?.holidays?.size ?: 0)
+        val preview = ImportPreview(manifest.type, manifest.exportedAt, previews, manifest.files.size, declaredTotal, settingsArchive?.allHolidays?.size ?: 0)
         return ImportSession(temp, manifest, archives, settingsArchive, preview)
     }
 
@@ -382,7 +381,7 @@ class BackupManager(
             ZipFile(session.file).use { zip ->
                 session.settingsArchive?.let { s ->
                     try {
-                        holidays = restoreSettings(s)
+                        holidays = restoreSettings(s, warnings)
                     } catch (e: CancellationException) {
                         throw e
                     } catch (e: Exception) {
@@ -664,8 +663,11 @@ class BackupManager(
     private fun localSubPath(archivePath: String): String =
         if (archivePath.startsWith("images/")) archivePath.removePrefix("images/") else archivePath
 
-    /** Restores everything in settings.json and returns how many days off were added to the holiday planner. */
-    private suspend fun restoreSettings(s: SettingsArchive): Int {
+    /**
+     * Restores everything in settings.json and returns how many days off were added to the holiday
+     * planner. Anything the user should know about (people the planner had no room for) goes in [warnings].
+     */
+    private suspend fun restoreSettings(s: SettingsArchive, warnings: MutableList<String>): Int {
         s.travellers.forEach { t -> if (t.name.isNotBlank() && db.travellerDao().findByName(t.name) == null) db.travellerDao().insert(TravellerEntity(name = t.name.trim())) }
         s.categories.forEach { c -> if (c.name.isNotBlank() && db.expenseDao().findCategory(c.name) == null) db.expenseDao().insertCategory(c.copy(id = 0)) }
         settings.setDefaultCurrency(s.defaultCurrency)
@@ -673,13 +675,23 @@ class BackupManager(
         // Older backups have no look, and a newer app may name one this version lacks: keep the current one.
         AppTheme.entries.firstOrNull { it.name == s.appTheme }?.let { settings.setAppTheme(it) }
         SettingsRepository.decodeRates(s.exchangeRates.joinToString(";")).forEach { settings.setExchangeRate(it.from, it.to, it.rate) }
-        s.holidayPrefs?.let { settings.setHolidayPrefs(SettingsRepository.restore(it, settings.holidayPrefs.first())) }
+        val before = settings.holidayPrefs.first()
+        s.holidayPrefs?.let { settings.setHolidayPrefs(SettingsRepository.restore(it, before)) }
         val people = settings.holidayPrefs.first().people.map { it.id }.toSet()
+        // The planner has room for only so many people and the backup's come first. Anyone added on
+        // this phone who no longer fits is removed with their days off, rather than leaving days off
+        // that nothing shows, and the user is told.
+        val pushedOut = before.extras.filter { it.id !in people }
+        if (pushedOut.isNotEmpty()) {
+            warnings += "Holiday planner: there was no room for ${pushedOut.joinToString { it.name }}, " +
+                "added on this phone, so ${if (pushedOut.size == 1) "they were" else "they were all"} removed with their days off."
+        }
         // Days off are merged: a day already marked on this device is kept, and only gains the
         // backup's name for it if it had none.
         var added = 0
         db.withTransaction {
-            s.holidays.forEach { h ->
+            pushedOut.forEach { db.holidayDao().deleteOwner(it.id) }
+            s.allHolidays.forEach { h ->
                 // A day off for someone who is not in the planner would never show, so it is not restored.
                 if (h.date.year !in HOLIDAY_YEARS || h.owner !in people) return@forEach
                 val label = h.label.trim().take(HolidayEntity.MAX_LABEL)
