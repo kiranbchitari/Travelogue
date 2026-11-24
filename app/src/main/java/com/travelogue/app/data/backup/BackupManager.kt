@@ -2,6 +2,7 @@ package com.travelogue.app.data.backup
 
 import android.content.Context
 import android.net.Uri
+import android.provider.DocumentsContract
 import androidx.room.withTransaction
 import com.travelogue.app.BuildConfig
 import com.travelogue.app.core.designsystem.theme.AppTheme
@@ -60,12 +61,33 @@ class BackupManager(
     // =========================================================================================
 
     suspend fun exportTrip(tripId: Long, target: Uri, progress: Progress = { _, _ -> }): ExportResult = withContext(Dispatchers.IO) {
-        // One transaction: every row comes from the same moment, even if the user is editing meanwhile.
-        val bundle = db.withTransaction { collect(tripId) } ?: throw BackupException("This trip no longer exists.")
-        writeArchive(target, BackupType.TRIP, listOf(bundle), settingsArchive = null, progress)
+        removingOnFailure(target) {
+            // One transaction: every row comes from the same moment, even if the user is editing meanwhile.
+            val bundle = db.withTransaction { collect(tripId) } ?: throw BackupException("This trip no longer exists.")
+            writeArchive(target, BackupType.TRIP, listOf(bundle), settingsArchive = null, progress)
+        }
     }
 
     suspend fun exportAll(target: Uri, progress: Progress = { _, _ -> }): ExportResult = withContext(Dispatchers.IO) {
+        removingOnFailure(target) { writeFullBackup(target, progress) }
+    }
+
+    /**
+     * Runs an export into [target] and, if it fails, deletes what was written there. The file picker
+     * has already created the file by then, and a cut-off ZIP left under a backup's name could later
+     * be mistaken for a good backup.
+     */
+    private inline fun <T> removingOnFailure(target: Uri, export: () -> T): T = try {
+        export()
+    } catch (e: Throwable) {
+        runCatching {
+            if (target.scheme == "file") target.path?.let { File(it).delete() }
+            else DocumentsContract.deleteDocument(context.contentResolver, target)
+        }
+        throw e
+    }
+
+    private suspend fun writeFullBackup(target: Uri, progress: Progress): ExportResult {
         // Every database read happens in one transaction, so the backup is a single consistent snapshot
         // even if the user edits or deletes something while it runs. It is only reads, so it is quick.
         class Snapshot(
@@ -97,7 +119,7 @@ class BackupManager(
             exchangeRates = s.exchangeRates.map { SettingsRepository.encodeRates(listOf(it)) },
             holidayPrefs = SettingsRepository.archive(holidayPrefs),
         ).withHolidays(holidays)
-        writeArchive(target, BackupType.FULL, bundles, settingsArchive, progress).copy(holidays = holidays.size, contents = snap.counts)
+        return writeArchive(target, BackupType.FULL, bundles, settingsArchive, progress).copy(holidays = holidays.size, contents = snap.counts)
     }
 
     /** Live totals of everything a full backup would contain. */
@@ -285,7 +307,9 @@ class BackupManager(
             val isDocument = n.startsWith("documents/") || n.contains("/documents/")
             val allowed = if (isDocument) ext.matches(DOCUMENT_EXTENSION) else ext in ALLOWED_EXTENSIONS
             if (!allowed) throw BackupException("Unsupported file type in archive: ${n.substringAfterLast('/')}")
-            if (e.size > MAX_ENTRY_BYTES) throw BackupException("A file in the archive is too large: ${n.substringAfterLast('/')}")
+            // One oversized photo must not block restoring everything else: it is left out with a
+            // warning when its trip is restored (see importTrip). JSON has its own limit in readText.
+            if (e.size > MAX_ENTRY_BYTES) continue
             declaredTotal += e.size.coerceAtLeast(0)
         }
         media.ensureSpace(declaredTotal)
@@ -473,10 +497,12 @@ class BackupManager(
      */
     suspend fun recoverInterruptedImports() = withContext(Dispatchers.IO) {
         stagingLock.withLock {
-            // Archives copied for an import (or kept for a retry) that the process died holding.
+            // Archives copied for an import (or kept for a retry), and Drive backups being packed or
+            // downloaded, that the process died holding. Each can be as big as a whole backup.
             val staleBefore = System.currentTimeMillis() - STALE_IMPORT_MS
-            context.cacheDir.listFiles { f -> f.isFile && f.name.startsWith(IMPORT_PREFIX) && f.name.endsWith(".zip") && f.lastModified() < staleBefore }
-                ?.forEach { it.delete() }
+            context.cacheDir.listFiles { f ->
+                f.isFile && (f.name.startsWith(IMPORT_PREFIX) || f.name.startsWith(DRIVE_TEMP_PREFIX)) && f.name.endsWith(".zip") && f.lastModified() < staleBefore
+            }?.forEach { it.delete() }
             val mediaRoot = File(media.root, MediaStorage.MEDIA_DIR)
             val leftovers = mediaRoot.listFiles { f -> f.isDirectory && f.name.startsWith(STAGING_PREFIX) } ?: return@withLock
             for (staging in leftovers) {
@@ -532,6 +558,7 @@ class BackupManager(
             referenced.forEachIndexed { i, p ->
                 val entry = zip.getEntry(prefix + p)
                 if (entry == null) { warnings += "Missing file: ${p.substringAfterLast('/')}"; return@forEachIndexed }
+                if (entry.size > MAX_ENTRY_BYTES) { warnings += "Too large to restore: ${p.substringAfterLast('/')}"; return@forEachIndexed }
                 val target = File(staging, localSubPath(p))
                 target.parentFile?.mkdirs()
                 zip.getInputStream(entry).use { i2 -> target.outputStream().use { o -> copyLimited(i2, o, MAX_ENTRY_BYTES) } }
@@ -736,6 +763,8 @@ class BackupManager(
         val ALLOWED_EXTENSIONS = setOf("json", "jpg", "jpeg", "png", "webp", "heic", "heif", "gif", "pdf", "bin")
         private const val STAGING_PREFIX = ".staging-"
         private const val IMPORT_PREFIX = "import-"
+        /** Cache files holding a Drive backup while it is packed and uploaded, or downloaded for a restore. */
+        const val DRIVE_TEMP_PREFIX = "drive-"
         /** Older than any import still being prepared when the app starts. */
         private const val STALE_IMPORT_MS = 10 * 60 * 1000L
         /** Guards the calendar against nonsense dates in a hand-edited backup. */

@@ -137,7 +137,7 @@ object BackupController {
 
     fun exportTrip(c: AppContainer, tripId: Long, uri: Uri) {
         if (!claim("Exporting trip", canHide = true)) return
-        c.appScope.launch { run {
+        c.appScope.launch { runJob {
             val r = c.backup.exportTrip(tripId, uri) { f, m -> _state.value = BackupUiState.Working("Exporting trip", f, m, canHide = true) }
             val extra = if (r.missingFiles > 0) "\n${r.missingFiles} missing file(s) were skipped." else ""
             BackupUiState.Done("Trip exported", "Saved the trip with ${if (r.files == 1) "1 file" else "${r.files} files"} (${Fmt.bytes(r.bytes)}).$extra")
@@ -146,7 +146,7 @@ object BackupController {
 
     fun exportAll(c: AppContainer, uri: Uri) {
         if (!claim("Saving backup", canHide = true)) return
-        c.appScope.launch { run {
+        c.appScope.launch { runJob {
             val r = c.backup.exportAll(uri) { f, m -> _state.value = BackupUiState.Working("Saving backup", f, m, canHide = true) }
             val name = c.media.displayName(uri) ?: BackupManager.backupFileName()
             val size = c.media.sizeOf(uri).takeIf { it > 0 } ?: r.bytes
@@ -157,7 +157,7 @@ object BackupController {
 
     fun inspect(c: AppContainer, uri: Uri) {
         if (!claim("Checking archive")) return
-        c.appScope.launch { run {
+        c.appScope.launch { runJob {
             val session = c.backup.inspect(uri) { f, m -> _state.value = BackupUiState.Working("Checking archive", f, m) }
             BackupUiState.Preview(session)
         } }
@@ -191,9 +191,9 @@ object BackupController {
         if (r.missingFiles > 0) "\n${r.missingFiles} file(s) were already missing from this phone and are not in the backup." else ""
 
     private suspend fun runImport(c: AppContainer, session: BackupManager.ImportSession, strategy: DuplicateStrategy) {
-        run {
+        runJob {
             val r = c.backup.import(session, strategy) { f, m -> _state.value = BackupUiState.Working("Importing", f, m) }
-            if (r.isPartial) return@run BackupUiState.PartialImport(r, strategy)
+            if (r.isPartial) return@runJob BackupUiState.PartialImport(r, strategy)
             val parts = buildList {
                 // A retry of settings alone has no trips to count.
                 if (session.archives.isNotEmpty()) add(if (r.imported == 1) "1 trip restored." else "${r.imported} trips restored.")
@@ -232,9 +232,10 @@ object BackupController {
     fun driveBackup(c: AppContainer, context: Context, token: String) {
         val title = "Backing up to Drive"
         if (!claim(title, canHide = true, handover = true)) return
-        c.appScope.launch { run {
-            val name = BackupManager.backupFileName().removeSuffix(".zip") + "_" + LocalTime.now().format(DateTimeFormatter.ofPattern("HHmm")) + ".zip"
-            val temp = File(context.cacheDir, "drive-${UUID.randomUUID()}.zip")
+        c.appScope.launch { runJob {
+            // Seconds too: two backups in the same minute would otherwise look identical in the restore list.
+            val name = BackupManager.backupFileName().removeSuffix(".zip") + "_" + LocalTime.now().format(DateTimeFormatter.ofPattern("HHmmss")) + ".zip"
+            val temp = File(context.cacheDir, "${BackupManager.DRIVE_TEMP_PREFIX}${UUID.randomUUID()}.zip")
             try {
                 val r = c.backup.exportAll(Uri.fromFile(temp)) { f, m ->
                     _state.value = BackupUiState.Working(title, f * 0.4f, m, step = "Step 1 of 2 · Packing your data", canHide = true)
@@ -260,7 +261,7 @@ object BackupController {
     /** Lists the backups in Drive so the user can pick one to restore. */
     fun driveList(c: AppContainer, token: String) {
         if (!claim("Google Drive", handover = true)) return
-        c.appScope.launch { run {
+        c.appScope.launch { runJob {
             _state.value = BackupUiState.Working("Google Drive", 0.2f, "Looking for backups…")
             val files = DriveClient(token).list()
             if (files.isEmpty()) BackupUiState.Done("No backups yet", "There are no Travelogue backups in your Google Drive. Use “Back up to Google Drive” first.")
@@ -271,8 +272,8 @@ object BackupController {
     /** Downloads the chosen backup and hands it to the normal import preview. */
     fun driveRestore(c: AppContainer, context: Context, token: String, file: DriveClient.DriveFile) {
         if (!claim("Downloading backup")) return
-        c.appScope.launch { run {
-            val temp = File(context.cacheDir, "drive-${UUID.randomUUID()}.zip")
+        c.appScope.launch { runJob {
+            val temp = File(context.cacheDir, "${BackupManager.DRIVE_TEMP_PREFIX}${UUID.randomUUID()}.zip")
             try {
                 DriveClient(token).download(file, temp) { f ->
                     _state.value = BackupUiState.Working("Downloading backup", f * 0.8f, "${file.name} · ${Fmt.bytes(file.size)}")
@@ -288,7 +289,7 @@ object BackupController {
     private fun daysOff(n: Int) = if (n == 1) "1 day off" else "$n days off"
 
     /** Runs a job that [claim] has already started, ending in its result or the error it hit. */
-    private suspend fun run(block: suspend () -> BackupUiState) {
+    private suspend fun runJob(block: suspend () -> BackupUiState) {
         _state.value = try {
             block()
         } catch (e: BackupException) {
