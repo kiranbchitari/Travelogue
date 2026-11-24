@@ -4,10 +4,21 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Travelogue | Kiran B Chitari</title>
-    <meta name="description" content="Travelogue is an offline-first travel diary and expense manager for Android, by Kiran B Chitari.">
+    <meta name="description" content="Travelogue is an offline-first travel diary, itinerary planner and trip expense manager for Android, by Kiran B Chitari.">
+    <meta name="theme-color" content="#1f4a36">
+    <link rel="icon" type="image/png" sizes="32x32" href="images/favicon-32.png">
+    <link rel="apple-touch-icon" href="images/icon-180.png">
+    <meta property="og:type" content="website">
+    <meta property="og:title" content="Travelogue: every journey, kept beautifully">
+    <meta property="og:description" content="An offline travel diary, day-by-day itinerary planner and trip expense tracker for Android. No account, no ads.">
+    <meta property="og:url" content="https://kiranbchitari.github.io/Travelogue/">
+    <meta property="og:image" content="https://kiranbchitari.github.io/Travelogue/images/og.jpg">
+    <meta property="og:image:width" content="1024">
+    <meta property="og:image:height" content="500">
+    <meta name="twitter:card" content="summary_large_image">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <script>
         (function () {
             try {
@@ -22,9 +33,10 @@
     <!-- Shared portfolio design, served from kiranbchitari.github.io -->
     <link rel="stylesheet" href="/style.css">
     <link rel="stylesheet" href="travelogue.css">
+    <link rel="preload" as="image" href="images/hero.webp" fetchpriority="high">
     <noscript><style>.reveal, .reveal-delay { opacity: 1; transform: none; }</style></noscript>
 </head>
-<body>
+<body class="tl-home">
     <script>
         if (document.documentElement.classList.contains('theme-loading-light')) {
             document.body.classList.add('light-mode');
@@ -81,66 +93,133 @@
     </nav>
 
     <main>
-        <section class="hero app-hero section">
-            <div class="hero-content reveal">
-                <p class="greeting">Android app</p>
-                <h1 class="name">Travelogue</h1>
-                <p class="tagline">An offline-first travel diary and expense manager for Android.</p>
-                <p class="intro-description">
-                    Plan trips day by day, keep a diary with photos, track bookings, hotels and places, and split expenses with the people you travel with, across currencies. Everything lives on your phone.
-                </p>
-                <div class="hero-cta">
-                    <a href="#features" class="btn btn-primary">See Features</a>
-                    <a href="privacy.html" class="btn btn-secondary">Privacy Policy</a>
+        <!-- Hero -->
+        <section class="tl-hero">
+            <div class="tl-hero-inner">
+                <div class="tl-hero-text reveal">
+                    <div class="tl-brand">
+                        <img src="images/icon-180.png" alt="" width="56" height="56" class="tl-app-icon">
+                        <span class="tl-kicker">Android app</span>
+                    </div>
+                    <h1 class="tl-title">Travelogue</h1>
+                    <p class="tl-lede">Every journey, kept beautifully.</p>
+                    <p class="tl-intro">
+                        A travel diary, day-by-day planner and trip expense tracker in one private place: the plan, the people, the money and the memories. Everything stays on your phone.
+                    </p>
+                    <div class="tl-cta">
+                        <a href="#features" class="btn btn-primary">See what it does</a>
+                        <a href="privacy.html" class="btn btn-secondary">Privacy Policy</a>
+                    </div>
+                    <ul class="tl-chips" aria-label="Highlights">
+                        <li>Works offline</li>
+                        <li>No account</li>
+                        <li>No ads or tracking</li>
+                        <li>Light &amp; dark themes</li>
+                    </ul>
                 </div>
+                <figure class="tl-hero-art reveal-delay">
+                    <img src="images/hero.webp" width="1600" height="1037" fetchpriority="high"
+                         alt="Travelogue on two phones: the home screen with an upcoming Kyoto trip, and the Kerala Backwaters trip overview with 75% of the budget spent.">
+                </figure>
             </div>
         </section>
 
-        <section id="features" class="section">
-            <div class="section-header reveal">
+        <!-- Feature stories -->
+        <section id="features" class="section tl-features">
+            <div class="section-header tl-section-header reveal">
                 <span class="eyebrow">Features</span>
                 <h2>Your whole trip, in one place.</h2>
+                <p class="section-sub">Plan it before you go, track it while you're there, and keep it once you're home.</p>
             </div>
 
-            <div class="feature-grid">
-                <div class="feature-card glass-card reveal">
-                    <span class="feature-icon" aria-hidden="true">🗺️</span>
-                    <h3>Itineraries</h3>
-                    <p>Plan each day and drag activities into the order you want.</p>
+            <article class="tl-row">
+                <figure class="tl-shot reveal">
+                    <img src="images/itinerary.webp" width="800" height="1037" loading="lazy" decoding="async"
+                         alt="The itinerary tab for Kerala Backwaters, showing day one in Fort Kochi with timed activities ticked off.">
+                </figure>
+                <div class="tl-copy reveal-delay">
+                    <span class="eyebrow">Plan</span>
+                    <h3>Plan each day, hour by hour.</h3>
+                    <p>Build a day-by-day itinerary and tick things off as you go.</p>
+                    <ul class="tl-list">
+                        <li>Times, places and notes for every activity</li>
+                        <li>Drag to reorder the day</li>
+                        <li>Hotels, bookings, places and useful contacts kept with each trip</li>
+                    </ul>
                 </div>
-                <div class="feature-card glass-card reveal">
-                    <span class="feature-icon" aria-hidden="true">📔</span>
-                    <h3>Diary &amp; memories</h3>
-                    <p>Diary entries, photos and memories for every trip.</p>
+            </article>
+
+            <article class="tl-row tl-row--flip">
+                <figure class="tl-shot reveal">
+                    <img src="images/expenses.webp" width="800" height="1037" loading="lazy" decoding="async"
+                         alt="The financial summary: each traveller's share, balances, and who owes whom with mark-as-paid buttons.">
+                </figure>
+                <div class="tl-copy reveal-delay">
+                    <span class="eyebrow">Spend</span>
+                    <h3>Split costs, settle up.</h3>
+                    <p>Log expenses in any currency and see totals in your home currency, using rates you enter.</p>
+                    <ul class="tl-list">
+                        <li>Expenses by category, day and who paid</li>
+                        <li>Budgets, splits and a clear who-owes-whom</li>
+                        <li>Cost per person, daily average and category breakdown</li>
+                    </ul>
                 </div>
-                <div class="feature-card glass-card reveal">
-                    <span class="feature-icon" aria-hidden="true">💸</span>
-                    <h3>Shared expenses</h3>
-                    <p>Categories, travellers, splits and multi-currency totals.</p>
+            </article>
+
+            <article class="tl-row tl-row--wide">
+                <div class="tl-copy tl-copy--center reveal">
+                    <span class="eyebrow">Remember</span>
+                    <h3>Photos from every trip, relived as a story.</h3>
+                    <p>A scrapbook of moments and favourites across all your trips, and a day-by-day story of each one, told with its photos and diary.</p>
                 </div>
-                <div class="feature-card glass-card reveal">
-                    <span class="feature-icon" aria-hidden="true">🏨</span>
-                    <h3>Bookings &amp; places</h3>
-                    <p>Bookings, hotels, places and contacts kept together.</p>
+                <figure class="tl-shot tl-shot--wide reveal-delay">
+                    <img src="images/memories.webp" width="1600" height="1037" loading="lazy" decoding="async"
+                         alt="Two phones: the memories scrapbook with photos grouped by month, and the Kerala Backwaters trip story opening on day one at Fort Kochi Beach.">
+                </figure>
+            </article>
+
+            <article class="tl-row">
+                <figure class="tl-shot reveal">
+                    <img src="images/holidays.webp" width="800" height="1037" loading="lazy" decoding="async"
+                         alt="The holiday planner calendar for March, with days off for Asha, Rohan and Dev and a highlighted stretch they all have off.">
+                </figure>
+                <div class="tl-copy reveal-delay">
+                    <span class="eyebrow">Find time off <span class="tl-badge">New</span></span>
+                    <h3>Find time off together.</h3>
+                    <p>Add your partner, family or friends, mark everyone's days off, and see when you can all get away.</p>
+                    <ul class="tl-list">
+                        <li>Indian public holidays built in</li>
+                        <li>Stretches of 3, 5 or 7+ days you all have off</li>
+                        <li>Leave ideas that turn a day or two into a long weekend</li>
+                    </ul>
                 </div>
-                <div class="feature-card glass-card reveal">
-                    <span class="feature-icon" aria-hidden="true">📅</span>
-                    <h3>Holiday planner</h3>
-                    <p>Plan time off around Indian public holidays.</p>
+            </article>
+
+            <article class="tl-row tl-row--flip">
+                <figure class="tl-shot reveal">
+                    <img src="images/backup.webp" width="800" height="1037" loading="lazy" decoding="async"
+                         alt="The backup and restore screen confirming the data is backed up to Google Drive, beside the settings screen with theme choices.">
+                </figure>
+                <div class="tl-copy reveal-delay">
+                    <span class="eyebrow">Keep</span>
+                    <h3>Backed up to your own Drive.</h3>
+                    <p>Optional backup to your own Google Drive, or export any trip as a ZIP and restore it on another phone.</p>
+                    <ul class="tl-list">
+                        <li>Writes only to a <em>Travelogue Backups</em> folder</li>
+                        <li>Travelogue can only see the files it creates there</li>
+                        <li>Pick a look you like, in light or dark</li>
+                    </ul>
                 </div>
-                <div class="feature-card glass-card reveal">
-                    <span class="feature-icon" aria-hidden="true">☁️</span>
-                    <h3>Backup &amp; export</h3>
-                    <p>Export any trip or a full backup as a ZIP, or back up to your own Google Drive.</p>
-                </div>
-            </div>
+            </article>
         </section>
 
-        <section id="privacy" class="section">
+        <!-- Privacy -->
+        <section id="privacy" class="section tl-closing">
             <div class="contact-card glass-card reveal">
+                <img src="images/icon-180.png" alt="" width="64" height="64" class="tl-app-icon tl-app-icon--lg">
                 <span class="eyebrow">Privacy</span>
                 <h2>Your data stays yours.</h2>
-                <p>No account, no ads, no analytics and no servers. Optional Google Drive backup writes only to a <em>Travelogue Backups</em> folder in your own Drive.</p>
+                <p>No account, no ads, no analytics and no servers. Everything is stored on your phone, and nothing leaves it unless you back it up yourself.</p>
                 <div class="promo-actions">
                     <a href="privacy.html" class="btn btn-primary">Read the Privacy Policy</a>
                     <a href="https://github.com/kiranbchitari/Travelogue" target="_blank" rel="noopener noreferrer" class="btn btn-secondary">Source on GitHub</a>
@@ -158,6 +237,7 @@
     <footer>
         <div class="footer-content">
             <p>&copy; 2026 Kiran B Chitari. Built with HTML, CSS &amp; JS.</p>
+            <p class="tl-credits">Screenshots show the app's sample trips. Their photos come from Wikimedia Commons contributors (CC BY / CC BY-SA), each credited in the app under Settings › Sample photo credits.</p>
         </div>
     </footer>
 
