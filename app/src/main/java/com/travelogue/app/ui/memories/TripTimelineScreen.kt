@@ -17,6 +17,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.layout.layout
+import androidx.compose.ui.unit.offset
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.compositeOver
@@ -177,7 +179,7 @@ private fun StoryEventRow(event: StoryEvent, last: Boolean, mirrored: Boolean, t
 
         is StoryEvent.Place -> StoryRail(event.place.category.icon, c.secondary, last) {
             val p = event.place
-            Column(Modifier.clip(Shapes.sm).clickable { nav.place(p.id) }) {
+            Column(Modifier.storyTap { nav.place(p.id) }) {
                 Overline("Visited · ${p.category.label}", color = c.secondary)
                 Spacer(Modifier.height(4.dp))
                 Text(p.name, style = Travel.type.title, color = c.ink)
@@ -195,7 +197,7 @@ private fun StoryEventRow(event: StoryEvent, last: Boolean, mirrored: Boolean, t
 
         is StoryEvent.CheckIn -> StoryRail(Icons.Rounded.Hotel, c.chart[4], last) {
             val h = event.hotel
-            Column(Modifier.clip(Shapes.sm).clickable { nav.hotel(h.id) }) {
+            Column(Modifier.storyTap { nav.hotel(h.id) }) {
                 Overline("Checked in · ${Fmt.nights(h.nights)}", color = c.chart[4])
                 Spacer(Modifier.height(4.dp))
                 Text(h.name, style = Travel.type.title, color = c.ink)
@@ -216,13 +218,13 @@ private fun StoryEventRow(event: StoryEvent, last: Boolean, mirrored: Boolean, t
             Text(
                 "Checked out of ${event.hotel.name}",
                 style = Travel.type.body, color = c.inkSoft,
-                modifier = Modifier.clip(Shapes.sm).clickable { nav.hotel(event.hotel.id) }.padding(vertical = 2.dp),
+                modifier = Modifier.storyTap { nav.hotel(event.hotel.id) }.padding(vertical = 2.dp),
             )
         }
 
         is StoryEvent.Activity -> StoryRail(Icons.Rounded.Flag, event.activity.status.color(), last) {
             val a = event.activity
-            Column(Modifier.clip(Shapes.sm).clickable { nav.activityEditor(tripId, a.id) }) {
+            Column(Modifier.storyTap { nav.activityEditor(tripId, a.id) }) {
                 val times = listOfNotNull(a.startTime?.let(Fmt::time), a.endTime?.let(Fmt::time)).joinToString(" – ")
                 Overline(listOf("Itinerary", times).filter { it.isNotBlank() }.joinToString(" · "), color = a.status.color())
                 Spacer(Modifier.height(4.dp))
@@ -241,7 +243,7 @@ private fun StoryEventRow(event: StoryEvent, last: Boolean, mirrored: Boolean, t
 
         is StoryEvent.Booking -> StoryRail(event.booking.type.icon, c.chart[5], last) {
             val bk = event.booking
-            Column(Modifier.fillMaxWidth().clip(Shapes.sm).clickable { nav.bookingEditor(tripId, bk.id) }) {
+            Column(Modifier.fillMaxWidth().storyTap { nav.bookingEditor(tripId, bk.id) }) {
                 Overline(listOfNotNull(bk.type.label, bk.departure?.let { Fmt.time(it.toLocalTime()) }).joinToString(" · "), color = c.chart[5])
                 Spacer(Modifier.height(4.dp))
                 Text(bk.title, style = Travel.type.titleSmall, color = c.ink)
@@ -274,7 +276,7 @@ private fun ExpenseSummary(event: StoryEvent.Expenses, tripId: Long, nav: Nav) {
     var expanded by rememberSaveable(event.key) { mutableStateOf(false) }
     Column(Modifier.animateContentSize()) {
         Row(
-            Modifier.fillMaxWidth().clip(Shapes.sm).clickable { expanded = !expanded }.padding(vertical = 2.dp),
+            Modifier.fillMaxWidth().storyTap { expanded = !expanded }.padding(vertical = 2.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Column(Modifier.weight(1f)) {
@@ -293,7 +295,7 @@ private fun ExpenseSummary(event: StoryEvent.Expenses, tripId: Long, nav: Nav) {
             event.expenses.forEach { e ->
                 val cat = e.categoryId?.let { event.categories[it] }
                 Row(
-                    Modifier.fillMaxWidth().clip(Shapes.sm).clickable { nav.expenseEditor(tripId, e.id) }.padding(vertical = 6.dp),
+                    Modifier.fillMaxWidth().storyTap { nav.expenseEditor(tripId, e.id) }.padding(vertical = 6.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     IconBadge(cat.icon(), cat.colorValue(), size = 30.dp, iconSize = 15.dp)
@@ -308,3 +310,18 @@ private fun ExpenseSummary(event: StoryEvent.Expenses, tripId: Long, nav: Nav) {
         }
     }
 }
+
+/**
+ * A tappable block of the story with a rounded ripple. The rounded clip reaches [StoryTapBleed] past
+ * the text on every side: clipped right at the text's edge, its corners cut off the first letter of
+ * the block's first and last lines ("FLIGHT", "VISITED"). The text itself stays where it was.
+ */
+@Composable
+private fun Modifier.storyTap(onClick: () -> Unit): Modifier =
+    this.layout { measurable, constraints ->
+        val bleed = StoryTapBleed.roundToPx()
+        val placeable = measurable.measure(constraints.offset(2 * bleed, 2 * bleed))
+        layout(placeable.width - 2 * bleed, placeable.height - 2 * bleed) { placeable.place(-bleed, -bleed) }
+    }.clip(Shapes.sm).clickable(onClick = onClick).padding(StoryTapBleed)
+
+private val StoryTapBleed = 6.dp
