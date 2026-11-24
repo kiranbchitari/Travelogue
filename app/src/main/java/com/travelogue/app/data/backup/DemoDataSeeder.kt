@@ -1,13 +1,6 @@
 package com.travelogue.app.data.backup
 
 import android.content.Context
-import android.graphics.Bitmap
-import android.graphics.Canvas
-import android.graphics.LinearGradient
-import android.graphics.Paint
-import android.graphics.Path
-import android.graphics.RadialGradient
-import android.graphics.Shader
 import com.travelogue.app.core.storage.MediaStorage
 import com.travelogue.app.data.db.AppDatabase
 import com.travelogue.app.data.db.entity.*
@@ -24,7 +17,7 @@ import kotlin.random.Random
 
 /**
  * Optional demo content (Settings → Load sample trips). Everything is created through the normal
- * repositories, with generated artwork instead of real photos. Demo trips have a "demo-" uuid prefix
+ * repositories, with real photos of each place bundled in the app (see [SamplePhotos]). Demo trips have a "demo-" uuid prefix
  * so they can be removed without touching the user's own trips.
  */
 class DemoDataSeeder(
@@ -67,7 +60,7 @@ class DemoDataSeeder(
         val start = today.minusDays(128)
         val end = start.plusDays(5)
         val uuid = PREFIX + UUID.randomUUID()
-        val cover = art(uuid, "cover", 0, Style.WATER)
+        val cover = cover(uuid, "k_cover")
         val tripId = trips.save(
             TripEntity(
                 uuid = uuid, name = "Kerala Backwaters", destination = "Kochi & Alleppey", country = "India",
@@ -117,7 +110,7 @@ class DemoDataSeeder(
                 review = HotelReview(5, 4, 5, 5, 4, "Waking up to mist on the lake with chai on the deck was the highlight of the trip. The cook, Babu chettan, made the best karimeen pollichathu we've ever had.", "Incredible food\nSilent, slow cruise\nFriendly crew", "AC only runs at night\nLimited Wi-Fi", true),
             ),
         )
-        addArt(tripId, uuid, PhotoOwner.HOTEL, houseboat, start.plusDays(2).atTime(15, 0), Style.WATER, 2, listOf("Our houseboat at Punnamada", "Dinner on the deck"))
+        addPhotos(tripId, uuid, PhotoOwner.HOTEL, houseboat, start.plusDays(2).atTime(15, 0), "k_hb1" to "Our houseboat at Punnamada", "k_hb2" to "Breakfast on the deck")
         val homestay = journal.saveHotel(
             HotelEntity(
                 tripId = tripId, name = "Misty Hills Homestay", address = "Chithirapuram, Munnar", checkIn = start.plusDays(3), checkOut = end,
@@ -126,7 +119,7 @@ class DemoDataSeeder(
                 review = HotelReview(4, 4, 5, 5, 5, "A family home tucked into the tea slopes. Simple rooms, huge hospitality.", "Homely breakfast\nGreat hosts", "Steep road up\nCold nights", true),
             ),
         )
-        addArt(tripId, uuid, PhotoOwner.HOTEL, homestay, start.plusDays(3).atTime(16, 30), Style.HILLS, 1, listOf("Valley view from the room"))
+        addPhotos(tripId, uuid, PhotoOwner.HOTEL, homestay, start.plusDays(3).atTime(16, 30), "k_homestay" to "Valley view from the room")
 
         val days = journal.getDays(tripId)
         suspend fun act(d: Int, name: String, loc: String, h1: Int, h2: Int, est: Double?, actual: Double?, desc: String = "", status: ActivityStatus = ActivityStatus.COMPLETED) {
@@ -151,12 +144,12 @@ class DemoDataSeeder(
         act(4, "Eravikulam National Park", "Rajamalai", 11, 14, 600.0, null, status = ActivityStatus.SKIPPED)
 
         val fortKochi = journal.savePlace(PlaceEntity(tripId = tripId, name = "Fort Kochi Beach", address = "Fort Kochi, Kochi", mapsUrl = "https://maps.google.com/?q=Fort+Kochi+Beach", latitude = 9.9658, longitude = 76.2421, category = PlaceCategory.BEACH, visitDate = start, rating = 4, description = "Chinese fishing nets, old Dutch bungalows and the best evening light."))
-        addArt(tripId, uuid, PhotoOwner.PLACE, fortKochi, start.atTime(18, 0), Style.SUNSET, 2, listOf("Fishing nets at dusk", ""))
+        addPhotos(tripId, uuid, PhotoOwner.PLACE, fortKochi, start.atTime(18, 0), "k_fk1" to "Fishing nets at dusk", "k_fk2" to "")
         journal.savePlace(PlaceEntity(tripId = tripId, name = "Kashi Art Café", address = "Burgher Street, Fort Kochi", category = PlaceCategory.RESTAURANT, visitDate = start, rating = 5, description = "Gallery-café with a leafy courtyard. Get the chocolate cake."))
         val vembanad = journal.savePlace(PlaceEntity(tripId = tripId, name = "Vembanad Lake", address = "Alappuzha", latitude = 9.5916, longitude = 76.3940, category = PlaceCategory.NATURE, visitDate = start.plusDays(2), rating = 5, description = "Kerala's longest lake. Kingfishers everywhere."))
-        addArt(tripId, uuid, PhotoOwner.PLACE, vembanad, start.plusDays(2).atTime(7, 0), Style.WATER, 1, listOf("Morning mist on Vembanad"))
+        addPhotos(tripId, uuid, PhotoOwner.PLACE, vembanad, start.plusDays(2).atTime(7, 0), "k_vemb" to "Morning mist on Vembanad")
         val kolukkumalai = journal.savePlace(PlaceEntity(tripId = tripId, name = "Kolukkumalai Tea Estate", address = "Suryanelli, Munnar", category = PlaceCategory.ADVENTURE, visitDate = start.plusDays(4), rating = 5, description = "Bumpy jeep ride, unforgettable sunrise above the clouds."))
-        addArt(tripId, uuid, PhotoOwner.PLACE, kolukkumalai, start.plusDays(4).atTime(6, 15), Style.HILLS, 2, listOf("Sunrise above the clouds", "Tea rows"))
+        addPhotos(tripId, uuid, PhotoOwner.PLACE, kolukkumalai, start.plusDays(4).atTime(6, 15), "k_kol1" to "Sunrise above the clouds", "k_kol2" to "Tea rows")
         journal.savePlace(PlaceEntity(tripId = tripId, name = "Mattancherry Palace", address = "Mattancherry, Kochi", category = PlaceCategory.HISTORICAL, visitDate = start.plusDays(1), rating = 0, description = "Closed on the day we went — next time."))
 
         journal.saveBooking(BookingEntity(tripId = tripId, title = "BLR → COK", type = BookingType.FLIGHT, provider = "IndiGo 6E 467", reference = "QX7P2L", fromPlace = "Bengaluru", toPlace = "Kochi", departure = start.atTime(7, 45), arrival = start.atTime(9, 0), amount = 14850.0, currency = "INR"))
@@ -168,12 +161,12 @@ class DemoDataSeeder(
         journal.saveContact(TravelContactEntity(tripId = tripId, name = "Tourist police Kochi", type = ContactType.EMERGENCY, phone = "+91 484 2668 000"))
 
         val e1 = diary.save(DiaryEntryEntity(tripId = tripId, title = "Nets, light and Kathakali", body = "We landed into thick, warm air that smelled of rain and frying banana chips. By evening we were on Fort Kochi beach watching the giant Chinese nets dip into the water, four men leaning on the counterweights in perfect rhythm.\n\nThe Kathakali performance afterwards was hypnotic — an hour of make-up, then eyes that could tell a whole story without a word. Dev tried to copy the eye movements all the way to dinner.", dateTime = start.atTime(22, 30), location = "Fort Kochi", mood = Mood.AMAZED), listOf("culture", "sunset", "food"))
-        addArt(tripId, uuid, PhotoOwner.DIARY, e1, start.atTime(18, 10), Style.SUNSET, 1, listOf("The first sunset of the trip"))
+        addPhotos(tripId, uuid, PhotoOwner.DIARY, e1, start.atTime(18, 10), "k_e1" to "The first sunset of the trip")
         val e2 = diary.save(DiaryEntryEntity(tripId = tripId, title = "A day that moved at the speed of water", body = "No signal, no plans. The houseboat drifted past paddy fields lower than the water, ducks herded by a single man with a stick, kids waving from every jetty. Lunch was served on banana leaves on the deck.\n\nAt night the crew moored by a village and we fell asleep to frogs and distant temple music.", dateTime = start.plusDays(2).atTime(21, 0), location = "Vembanad Lake", mood = Mood.CALM), listOf("houseboat", "slow travel"))
-        addArt(tripId, uuid, PhotoOwner.DIARY, e2, start.plusDays(2).atTime(16, 0), Style.WATER, 3, listOf("Paddy fields below the water line", "Lunch on the deck", ""))
+        addPhotos(tripId, uuid, PhotoOwner.DIARY, e2, start.plusDays(2).atTime(16, 0), "k_e2a" to "Paddy fields below the water line", "k_e2b" to "Lunch on the deck", "k_e2c" to "")
         val e3 = diary.save(DiaryEntryEntity(tripId = tripId, title = "Above the clouds", body = "4am alarm, a jeep that rattled every bone, and then — the sun came up over a sea of cloud with the tea rows glowing gold. Nobody spoke for a full five minutes.", dateTime = start.plusDays(4).atTime(10, 0), location = "Kolukkumalai", mood = Mood.GRATEFUL), listOf("sunrise", "hills"))
-        addArt(tripId, uuid, PhotoOwner.DIARY, e3, start.plusDays(4).atTime(6, 20), Style.HILLS, 2, listOf("Worth the 4am alarm", ""))
-        addArt(tripId, uuid, PhotoOwner.GENERAL, null, start.plusDays(1).atTime(11, 0), Style.SUNSET, 2, listOf("Spice market colours", "Mattancherry streets"))
+        addPhotos(tripId, uuid, PhotoOwner.DIARY, e3, start.plusDays(4).atTime(6, 20), "k_e3a" to "Worth the 4am alarm", "k_e3b" to "")
+        addPhotos(tripId, uuid, PhotoOwner.GENERAL, null, start.plusDays(1).atTime(11, 0), "k_g1" to "Spice market colours", "k_g2" to "Mattancherry streets")
         favouriteFirst(tripId, 3)
     }
 
@@ -181,7 +174,7 @@ class DemoDataSeeder(
         val start = today.minusDays(46)
         val end = start.plusDays(6)
         val uuid = PREFIX + UUID.randomUUID()
-        val cover = art(uuid, "cover", 1, Style.CITY)
+        val cover = cover(uuid, "p_cover")
         val tripId = trips.save(
             TripEntity(
                 uuid = uuid, name = "Lisbon & Porto", destination = "Lisbon, Sintra, Porto", country = "Portugal",
@@ -219,17 +212,17 @@ class DemoDataSeeder(
         exp("Francesinha dinner", 31.5, "EUR", "restaurant", 5, "Rohan", "Porto")
 
         val apt = journal.saveHotel(HotelEntity(tripId = tripId, name = "Casa do Alfama", address = "Rua de São Miguel, Lisbon", checkIn = start, checkOut = start.plusDays(3), roomType = "One-bedroom apartment", bookingReference = "HMX4Q2", bookingPlatform = "Booking site", pricePerNight = 155.0, totalPrice = 465.0, currency = "EUR", amenities = "Wi-Fi, Kitchen, Balcony, AC", review = HotelReview(4, 5, 5, 4, 4, "Tiny balcony over the rooftops of Alfama. Fado drifted up from the street every night.", "Location\nSpotless", "Steep stairs, no lift", true)))
-        addArt(tripId, uuid, PhotoOwner.HOTEL, apt, start.atTime(15, 0), Style.CITY, 1, listOf("Rooftops from the balcony"))
+        addPhotos(tripId, uuid, PhotoOwner.HOTEL, apt, start.atTime(15, 0), "p_apt" to "Rooftops from the balcony")
         journal.saveHotel(HotelEntity(tripId = tripId, name = "Ribeira Riverside Guesthouse", address = "Cais da Ribeira, Porto", checkIn = start.plusDays(3), checkOut = end, roomType = "Double room, river view", pricePerNight = 130.0, totalPrice = 390.0, currency = "EUR", amenities = "Breakfast, Wi-Fi", review = HotelReview(3, 4, 5, 3, 3, "Unbeatable view of the Dom Luís bridge, but thin walls.", "View\nBreakfast pastries", "Noisy at night", false)))
 
         val belem = journal.savePlace(PlaceEntity(tripId = tripId, name = "Belém Tower", category = PlaceCategory.HISTORICAL, visitDate = start.plusDays(1), rating = 4, latitude = 38.6916, longitude = -9.2160, description = "Manueline lace in stone at the mouth of the Tagus."))
-        addArt(tripId, uuid, PhotoOwner.PLACE, belem, start.plusDays(1).atTime(12, 0), Style.WATER, 1, listOf(""))
+        addPhotos(tripId, uuid, PhotoOwner.PLACE, belem, start.plusDays(1).atTime(12, 0), "p_belem" to "")
         val pena = journal.savePlace(PlaceEntity(tripId = tripId, name = "Pena Palace", address = "Sintra", category = PlaceCategory.ATTRACTION, visitDate = start.plusDays(2), rating = 5, description = "A fairytale painted in yellow and red, floating in fog."))
-        addArt(tripId, uuid, PhotoOwner.PLACE, pena, start.plusDays(2).atTime(11, 0), Style.HILLS, 2, listOf("Pena in the fog", ""))
+        addPhotos(tripId, uuid, PhotoOwner.PLACE, pena, start.plusDays(2).atTime(11, 0), "p_pena1" to "Pena in the fog", "p_pena2" to "")
         journal.savePlace(PlaceEntity(tripId = tripId, name = "Livraria Lello", address = "Porto", category = PlaceCategory.SHOPPING, visitDate = start.plusDays(4), rating = 3, description = "Beautiful staircase, very long queue."))
         journal.saveBooking(BookingEntity(tripId = tripId, title = "Lisbon → Porto", type = BookingType.TRAIN, provider = "Alfa Pendular", reference = "CP 7Q19X", fromPlace = "Lisbon", toPlace = "Porto", departure = start.plusDays(3).atTime(9, 39), arrival = start.plusDays(3).atTime(12, 28), amount = 49.6, currency = "EUR"))
         val d = diary.save(DiaryEntryEntity(tripId = tripId, title = "Lost in Alfama", body = "We put the map away and followed the sound of fado down staircases that turned into alleys that turned into somebody's courtyard. Ended up with grilled sardines and a jug of vinho verde on a plastic table, perfect.", dateTime = start.plusDays(1).atTime(23, 0), location = "Alfama, Lisbon", mood = Mood.JOYFUL), listOf("food", "music"))
-        addArt(tripId, uuid, PhotoOwner.DIARY, d, start.plusDays(1).atTime(20, 0), Style.CITY, 2, listOf("Alfama at night", "Sardines!"))
+        addPhotos(tripId, uuid, PhotoOwner.DIARY, d, start.plusDays(1).atTime(20, 0), "p_d1" to "Alfama at night", "p_d2" to "Sardines!")
         favouriteFirst(tripId, 2)
     }
 
@@ -237,7 +230,7 @@ class DemoDataSeeder(
         val start = today.plusDays(24)
         val end = start.plusDays(7)
         val uuid = PREFIX + UUID.randomUUID()
-        val cover = art(uuid, "cover", 2, Style.HILLS)
+        val cover = cover(uuid, "y_cover")
         val tripId = trips.save(
             TripEntity(
                 uuid = uuid, name = "Kyoto in Winter", destination = "Kyoto & Nara", country = "Japan",
@@ -284,89 +277,20 @@ class DemoDataSeeder(
         db.photoDao().getForTrip(tripId).shuffled(Random(tripId)).take(n).forEach { photos.setFavourite(it.id, true) }
     }
 
-    private suspend fun addArt(tripId: Long, uuid: String, owner: PhotoOwner, ownerId: Long?, at: LocalDateTime, style: Style, count: Int, captions: List<String>) {
-        repeat(count) { i ->
-            val stored = media.saveBitmap(render(style, (uuid + owner + ownerId + i).hashCode()), uuid, owner.folder)
+    /** Adds bundled photos ([SamplePhotos] slot to caption) to the trip, a few minutes apart from [at]. */
+    private suspend fun addPhotos(tripId: Long, uuid: String, owner: PhotoOwner, ownerId: Long?, at: LocalDateTime, vararg photos: Pair<String, String>) {
+        photos.forEachIndexed { i, (slot, caption) ->
+            val stored = media.saveAsset(SamplePhotos.asset(slot), uuid, owner.folder)
             db.photoDao().insert(
                 TripPhotoEntity(
-                    tripId = tripId, ownerType = owner, ownerId = ownerId, relativePath = stored.relativePath, caption = captions.getOrElse(i) { "" },
+                    tripId = tripId, ownerType = owner, ownerId = ownerId, relativePath = stored.relativePath, caption = caption,
                     takenAt = at.plusMinutes(i * 17L), width = stored.width, height = stored.height, sizeBytes = stored.sizeBytes, sortOrder = i,
                 ),
             )
         }
     }
 
-    private suspend fun art(uuid: String, folder: String, seed: Int, style: Style): String =
-        media.saveBitmap(render(style, seed * 7919 + uuid.hashCode()), uuid, folder).relativePath
-
-    private enum class Style { SUNSET, WATER, HILLS, CITY }
-
-    /** Painterly landscape: gradient sky, glowing sun, layered silhouettes. */
-    private fun render(style: Style, seed: Int, w: Int = 1440, h: Int = 1000): Bitmap {
-        val rnd = Random(seed)
-        val bmp = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
-        val c = Canvas(bmp)
-        val p = Paint(Paint.ANTI_ALIAS_FLAG)
-        val (sky1, sky2, land1, land2) = when (style) {
-            Style.SUNSET -> listOf(0xFFF6C27A, 0xFFE0714A, 0xFF8E3B2E, 0xFF4A1F1A)
-            Style.WATER -> listOf(0xFFBFE0DA, 0xFF6FA8A3, 0xFF2F5D62, 0xFF173236)
-            Style.HILLS -> listOf(0xFFF3E3C3, 0xFFD9A86C, 0xFF6F7F4E, 0xFF34402A)
-            Style.CITY -> listOf(0xFFF5D3B8, 0xFFB5739A, 0xFF5A3B5C, 0xFF2A1C2E)
-        }.map { it.toInt() }
-        p.shader = LinearGradient(0f, 0f, 0f, h * 0.75f, sky1, sky2, Shader.TileMode.CLAMP)
-        c.drawRect(0f, 0f, w.toFloat(), h.toFloat(), p)
-        val sx = w * (0.25f + rnd.nextFloat() * 0.5f)
-        val sy = h * (0.35f + rnd.nextFloat() * 0.15f)
-        p.shader = RadialGradient(sx, sy, h * 0.4f, 0x66FFFFFF, 0x00FFFFFF, Shader.TileMode.CLAMP)
-        c.drawCircle(sx, sy, h * 0.4f, p)
-        p.shader = null
-        p.color = 0xEEFFF6E8.toInt()
-        c.drawCircle(sx, sy, h * 0.09f, p)
-
-        fun ridge(baseY: Float, amp: Float, color: Int, jag: Boolean) {
-            val path = Path()
-            path.moveTo(0f, h.toFloat())
-            path.lineTo(0f, baseY)
-            var x = 0f
-            val step = w / (if (jag) 9f else 5f)
-            while (x <= w + step) {
-                val y = baseY - rnd.nextFloat() * amp
-                if (jag) path.lineTo(x, y) else path.quadTo(x - step / 2, y - amp * 0.4f, x, baseY - rnd.nextFloat() * amp * 0.5f)
-                x += step
-            }
-            path.lineTo(w.toFloat(), h.toFloat())
-            path.close()
-            p.color = color
-            c.drawPath(path, p)
-        }
-        when (style) {
-            Style.WATER -> {
-                ridge(h * 0.6f, h * 0.06f, land1, false)
-                p.color = land2; c.drawRect(0f, h * 0.68f, w.toFloat(), h.toFloat(), p)
-                p.color = 0x33FFFFFF
-                repeat(14) { i -> val y = h * 0.72f + i * 18f; c.drawRect(w * rnd.nextFloat() * 0.6f, y, w * (0.4f + rnd.nextFloat() * 0.6f), y + 3f, p) }
-                // Palms
-                p.color = land2
-                repeat(3) { val px = w * (0.1f + rnd.nextFloat() * 0.8f); c.drawRect(px, h * 0.45f, px + 10f, h * 0.68f, p); c.drawCircle(px + 5f, h * 0.45f, 46f, p) }
-            }
-            Style.HILLS -> { ridge(h * 0.6f, h * 0.18f, blend(land1, sky2), true); ridge(h * 0.72f, h * 0.14f, land1, false); ridge(h * 0.86f, h * 0.08f, land2, false) }
-            Style.SUNSET -> { ridge(h * 0.7f, h * 0.08f, land1, false); ridge(h * 0.84f, h * 0.06f, land2, false) }
-            Style.CITY -> {
-                p.color = land1
-                var x = 0f
-                while (x < w) { val bw = 60f + rnd.nextFloat() * 110f; val bh = h * (0.15f + rnd.nextFloat() * 0.3f); c.drawRect(x, h * 0.78f - bh, x + bw - 8f, h.toFloat(), p); x += bw }
-                p.color = 0x55FFE7B0
-                repeat(60) { val wx = rnd.nextFloat() * w; val wy = h * (0.5f + rnd.nextFloat() * 0.26f); c.drawRect(wx, wy, wx + 12f, wy + 16f, p) }
-                p.color = land2; c.drawRect(0f, h * 0.84f, w.toFloat(), h.toFloat(), p)
-            }
-        }
-        return bmp
-    }
-
-    private fun blend(a: Int, b: Int): Int {
-        fun ch(x: Int, s: Int) = (x shr s) and 0xFF
-        return (0xFF shl 24) or (((ch(a, 16) + ch(b, 16)) / 2) shl 16) or (((ch(a, 8) + ch(b, 8)) / 2) shl 8) or ((ch(a, 0) + ch(b, 0)) / 2)
-    }
+    private suspend fun cover(uuid: String, slot: String): String = media.saveAsset(SamplePhotos.asset(slot), uuid, "cover").relativePath
 
     companion object {
         const val PREFIX = "demo-"

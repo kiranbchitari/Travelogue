@@ -106,12 +106,19 @@ class MediaStorage(private val context: Context) {
         throw e
     }
 
-    /** Writes an already-encoded bitmap (used for generated demo covers). */
-    suspend fun saveBitmap(bitmap: Bitmap, tripUuid: String, folder: String): StoredImage = withContext(Dispatchers.IO) {
+    /**
+     * Copies a photo bundled in the app's assets (the sample trips' photos) byte for byte. They are
+     * already sized and compressed for a phone, and encoding them again would only blur them.
+     */
+    suspend fun saveAsset(assetPath: String, tripUuid: String, folder: String): StoredImage = withContext(Dispatchers.IO) {
         val dir = File(tripDir(tripUuid), folder).apply { mkdirs() }
-        val target = File(dir, "${UUID.randomUUID()}.jpg")
-        target.outputStream().use { bitmap.compress(Bitmap.CompressFormat.JPEG, JPEG_QUALITY, it) }
-        StoredImage(relative(target), bitmap.width, bitmap.height, target.length())
+        val target = File(dir, "${UUID.randomUUID()}.${assetPath.substringAfterLast('.', "jpg")}")
+        writeOrDelete(target) {
+            context.assets.open(assetPath).use { i -> target.outputStream().use { o -> i.copyTo(o) } }
+            val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+            BitmapFactory.decodeFile(target.path, bounds)
+            StoredImage(relative(target), bounds.outWidth, bounds.outHeight, target.length())
+        }
     }
 
     /** A fresh file + content URI for camera capture into app storage. */

@@ -43,6 +43,10 @@ import com.travelogue.app.core.util.CommonCurrencies
 import com.travelogue.app.core.util.Fmt
 import com.travelogue.app.data.backup.BackupHealth
 import com.travelogue.app.data.backup.BackupStatus
+import com.travelogue.app.data.backup.SamplePhotos
+import com.travelogue.app.core.util.Intents
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import com.travelogue.app.ui.backup.destinationName
 import com.travelogue.app.ui.backup.healthLook
 import com.travelogue.app.ui.common.appViewModel
@@ -61,6 +65,7 @@ fun SettingsScreen(nav: Nav) {
     val backup by vm.backup.collectAsStateWithLifecycle()
     var confirmClear by remember { mutableStateOf(false) }
     var confirmDemoRemove by remember { mutableStateOf(false) }
+    var showPhotoCredits by remember { mutableStateOf(false) }
 
     LaunchedEffect(Unit) { vm.message.collect { Toast.makeText(context, it, Toast.LENGTH_LONG).show() } }
 
@@ -132,6 +137,8 @@ fun SettingsScreen(nav: Nav) {
                 } else {
                     ActionRow(Icons.Rounded.AutoAwesome, "Load sample trips", "Explore the app with three demo trips", Travel.colors.gold, vm::loadDemo)
                 }
+                // The photos ship inside the app, so their credits are shown whether or not the trips are loaded.
+                NavRow(Icons.Rounded.PhotoLibrary, "Sample photo credits", "Who took the sample trips' photos", { showPhotoCredits = true })
             }
         }
 
@@ -170,6 +177,35 @@ fun SettingsScreen(nav: Nav) {
         ConfirmDialog("Remove sample trips?", "The three demo trips and their photos will be deleted. Your own trips are not affected.", "Remove", vm::removeDemo, { confirmDemoRemove = false })
     }
     if (confirmClear) ClearDataDialog(onConfirm = vm::clearAll, onDismiss = { confirmClear = false })
+    if (showPhotoCredits) PhotoCreditsDialog { showPhotoCredits = false }
+}
+
+/** The sample trips' photos come from Wikimedia Commons; their licences ask for the author and licence to be named. */
+@Composable
+private fun PhotoCreditsDialog(onDismiss: () -> Unit) {
+    val context = LocalContext.current
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = Travel.colors.cardHigh,
+        shape = Shapes.lg,
+        title = { Text("Sample photo credits", style = Travel.type.title, color = Travel.colors.ink) },
+        text = {
+            Column(Modifier.heightIn(max = 460.dp).verticalScroll(rememberScrollState())) {
+                Text(
+                    "Photos from Wikimedia Commons, resized for the app. Tap one to see the original and its licence.",
+                    style = Travel.type.bodySmall, color = Travel.colors.inkFaint,
+                )
+                Spacer(Modifier.height(Space.sm))
+                SamplePhotos.credits.forEach { c ->
+                    Column(Modifier.fillMaxWidth().clip(Shapes.md).clickable { Intents.openUrl(context, c.source) }.padding(vertical = 8.dp)) {
+                        Text(c.subject, style = Travel.type.titleSmall, color = Travel.colors.ink)
+                        Text("${c.author} · ${c.license}", style = Travel.type.bodySmall, color = Travel.colors.inkSoft)
+                    }
+                }
+            }
+        },
+        confirmButton = { TextButton(onClick = onDismiss) { Text("Close", color = Travel.colors.accent) } },
+    )
 }
 
 /** One preview card per theme, each drawn in that theme's own colours, shapes and scenery. */
