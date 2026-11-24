@@ -25,15 +25,24 @@ KEEP THE MEMORIES
 • Add photos and documents to each trip
 • Browse a scrapbook of moments, favourites and stories across all your trips
 
-PLAN TIME OFF
+FIND TIME OFF TOGETHER
 • Holiday planner with Indian public holidays
-• Mark your days off and your partner's to find long weekends you can travel together
+• Add your partner, family or friends and mark everyone's days off
+• Choose who's coming and see the stretches of 3, 5 or 7+ days you all have off
+• Leave ideas show where a day or two of leave opens up a long weekend
 
 PRIVATE BY DESIGN
 • Works offline. Everything is stored on your phone
 • No account, no ads, no analytics, no tracking
 • Optional backup to your own Google Drive, into a "Travelogue Backups" folder. Travelogue can only see the files it creates there
 • Export any trip, or everything, as a ZIP and restore it on another phone
+
+MAKE IT YOURS
+• Five looks to choose from: ink & paper, beach day, mountain air, golden hour and postcard
+• Light and dark mode
+• Load three sample trips to explore the app, and remove them with one tap
+
+Screenshots show the sample trips, whose photos come from Wikimedia Commons contributors (CC BY / CC BY-SA). Each photographer is credited in the app under Settings › Sample photo credits.
 
 Privacy policy: https://kiranbchitari.github.io/Travelogue/privacy.html
 
@@ -47,4 +56,11 @@ Website: https://kiranbchitari.github.io/Travelogue/
 ## Graphics
 - App icon: icon-512.png (512×512)
 - Feature graphic: feature-graphic-1024x500.png
-- Phone screenshots: phone-1.png … phone-6.png (1080×1920)
+- Phone screenshots: phone-1.png … phone-8.png (1080×1920). Upload them in order: they form one continuous panorama, and the phones in 1→2 and 5→6 carry across the join.
+
+## Release notes – 1.1.2 (500)
+• Backups to Google Drive and to a ZIP now always finish; the button no longer stops responding
+• A failed backup no longer leaves a broken file behind
+• Restoring skips a single oversized photo instead of refusing the whole backup
+• Sample trips now show real photos of Kerala, Lisbon, Sintra and Kyoto
+• Fixed letters being cut off in the trip story
